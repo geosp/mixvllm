@@ -1,0 +1,18 @@
+# Configuration for Llama 2 7B model
+# Medium-sized model, single GPU
+
+model:
+  name: "meta-llama/Llama-2-7b-hf"
+
+inference:
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.85
+  max_model_len: 4096
+
+server:
+  host: "0.0.0.0"
+  port: 8001
+
+generation_defaults:
+  temperature: 0.7
+  max_tokens: 512

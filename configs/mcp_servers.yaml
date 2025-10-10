@@ -1,0 +1,40 @@
+# MCP Server Configuration
+# Configure available MCP (Model Context Protocol) servers
+# Each server can provide tools and resources to the chat client
+
+servers:
+  weather:
+    # Weather MCP server for weather queries
+    url: "http://agentgateway.mixwarecs-home.net/weather-mcp"
+    auth_token: "iaOPJQ29pv9gVVepAA89ZCLvM7eDbc4dbPGRxLl6dtLCFxNRNgU5Ygr0hMlP"
+    description: "Weather information and forecasts"
+    enabled: true
+
+  # Example: Add more MCP servers here
+  # database:
+  #   url: "http://localhost:3001/mcp"
+  #   auth_token: "your_db_token_here"
+  #   description: "Database queries and operations"
+  #   enabled: false
+
+  # web_search:
+  #   url: "http://localhost:3002/mcp"
+  #   description: "Web search and information retrieval"
+  #   enabled: false
+
+  # calculator:
+  #   url: "http://localhost:3003/mcp"
+  #   description: "Mathematical calculations and computations"
+  #   enabled: true
+
+# Global MCP settings
+settings:
+  # Timeout for MCP requests (seconds)
+  timeout: 30
+
+  # Retry settings
+  max_retries: 3
+  retry_delay: 1.0
+
+  # Auto-discover tools from servers
+  auto_discover_tools: true

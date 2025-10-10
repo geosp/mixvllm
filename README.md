@@ -118,3 +118,354 @@ With 2x RTX 3090 Ti (24GB each = 48GB total):
 - Verify both GPUs are being used
 - Ensure PCIe link is running at full speed
 
+## Model Serving
+
+Serve vLLM models with the `serve_model.py` script, which provides an OpenAI-compatible API server.
+
+### Basic Usage
+
+```bash
+# Serve Phi-3 Mini on single GPU
+uv run python serve_model.py --model microsoft/Phi-3-mini-4k-instruct --gpus 1
+
+# Serve Llama 2 70B with tensor parallelism
+uv run python serve_model.py --model meta-llama/Llama-2-70b-hf --gpus 2 --trust-remote-code
+```
+
+### Using Configuration Files
+
+```bash
+# Use predefined configurations
+uv run python serve_model.py --config configs/phi3-mini.yaml
+uv run python serve_model.py --config configs/llama-7b.yaml
+uv run python serve_model.py --config configs/llama-70b-tp2.yaml
+
+# Override config with CLI options
+uv run python serve_model.py --config configs/phi3-mini.yaml --port 8080
+```
+
+### Advanced Options
+
+```bash
+uv run python serve_model.py \
+  --model meta-llama/Llama-2-70b-hf \
+  --gpus 2 \
+  --gpu-memory 0.85 \
+  --max-model-len 4096 \
+  --port 8000 \
+  --temperature 0.8 \
+  --max-tokens 1024
+```
+
+### API Usage
+
+Once running, the server provides an OpenAI-compatible API:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Chat completion
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "microsoft/Phi-3-mini-4k-instruct",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+## Chat Client
+
+The included `src/utils/chat_client.py` provides a simple CLI chat interface for interactive conversations with your served models. It features rich terminal formatting and enhanced input handling similar to modern CLI applications.
+
+```bash
+# Install dependencies (if not already done)
+uv sync
+
+# Start chatting with default settings
+uv run python src/utils/chat_client.py
+
+# Connect to specific server and model
+uv run python src/utils/chat_client.py --url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
+
+# Enable streaming responses
+uv run python src/utils/chat_client.py --stream --temperature 0.8
+```
+
+### Chat Client Features
+
+- **Rich Terminal UI**: Beautiful formatting with colors, panels, and markdown rendering
+- **Conversation Context**: Maintains chat history for coherent conversations
+- **Command Support**: `/help`, `/clear`, `/history`, `/quit`
+- **Enhanced Input**: History-based auto-completion and navigation (with prompt_toolkit)
+- **Streaming Support**: Real-time response streaming with live updates
+- **Model Auto-detection**: Automatically detects available models from server
+- **Error Handling**: Clear error messages with appropriate formatting
+
+### Dependencies
+
+The chat client uses these optional libraries for enhanced UI:
+- `rich`: Beautiful terminal formatting and colors
+- `prompt_toolkit`: Enhanced input with history and completion
+- `requests`: HTTP client for API calls
+
+If these libraries are not available, the client falls back to basic text output.
+
+### Example Chat Session
+
+```
+✓ Connected to vLLM server at http://localhost:8000
+✓ Auto-selected model: microsoft/Phi-3-mini-4k-instruct
+
+╭─ Welcome ─────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│ 🤖 vLLM Chat Client                                                        │
+│                                                                            │
+│ Configuration:                                                             │
+│ • Server: http://localhost:8000                                            │
+│ • Model: microsoft/Phi-3-mini-4k-instruct                                  │
+│                                                                            │
+│ Commands: /help, /clear, /history, /quit                                   │
+│ Type your message and press Enter to chat!                                 │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+You: Hello! How are you today?
+╭─ 🤖 Assistant ─────────────────────────────────────────────────────────────╮
+│ Hello! I'm doing well, thank you for asking. I'm here and ready to help   │
+│ you with any questions or tasks you might have. How can I assist you      │
+│ today?                                                                     │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+You: Tell me about machine learning
+╭─ 🤖 Assistant ─────────────────────────────────────────────────────────────╮
+│ Machine learning is a fascinating field that involves teaching computers  │
+│ to learn from data and make predictions or decisions without being        │
+│ explicitly programmed for each specific task. It's a subset of artificial │
+│ intelligence that focuses on algorithms and statistical models that can   │
+│ improve their performance as they are exposed to more data.               │
+│                                                                            │
+│ There are several main types of machine learning:                          │
+│                                                                            │
+│ 1. **Supervised Learning**: The algorithm learns from labeled training    │
+│    data to make predictions on new, unseen data. Examples include          │
+│    classification (like spam detection) and regression (like predicting    │
+│    house prices).                                                          │
+│                                                                            │
+│ 2. **Unsupervised Learning**: The algorithm finds patterns in data        │
+│    without labeled examples. This includes clustering (grouping similar    │
+│    data points) and dimensionality reduction.                              │
+│                                                                            │
+│ 3. **Reinforcement Learning**: An agent learns through trial and error by │
+│    interacting with an environment, receiving rewards or penalties for     │
+│    actions.                                                                │
+│                                                                            │
+│ Machine learning has applications in many fields including computer        │
+│ vision, natural language processing, recommendation systems, autonomous    │
+│ vehicles, medical diagnosis, and financial trading.                        │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+You: /history
+╭─ 📝 Conversation History ──────────────────────────────────────────────────╮
+│ ┏━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ │
+│ ┃ Turn ┃ Role         ┃ Content                                         ┃ │
+│ ┡━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩ │
+│ │ 1    │ User         │ Hello! How are you today?                       │
+│ │ 2    │ Assistant    │ Hello! I'm doing well, thank you for asking. ... │
+│ │ 3    │ User         │ Tell me about machine learning                  │
+│ │ 4    │ Assistant    │ Machine learning is a fascinating field that... │
+│ └──────┴──────────────┴─────────────────────────────────────────────────┘ │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+You: /quit
+👋 Goodbye!
+```
+
+## Enhanced Chat Client with MCP Tools
+
+The `src/utils/chat_client_enhanced.py` provides an advanced chat client with MCP (Model Context Protocol) tool integration, enabling the LLM to call external tools during conversations.
+
+### Features
+
+- **MCP Tool Integration**: Weather queries and other MCP tools
+- **Tool Discovery Display**: Shows available MCP tools on startup
+- **Dual Modes**: Simple chat or agent mode with tool calling
+- **Rich Terminal UI**: Enhanced formatting with panels and colors
+- **Conversation Context**: Maintains chat history
+- **Streaming Support**: Real-time response streaming
+- **Command System**: `/help`, `/clear`, `/history`, `/mcp`, `/quit`
+
+### Installation
+
+Install additional dependencies for MCP support:
+
+```bash
+uv sync
+```
+
+### Usage
+
+**Note**: Since vLLM serves only one model at a time, the `--model` parameter is optional. The client will automatically detect and use the model currently loaded on the server.
+
+#### Simple Chat Mode (Default)
+
+```bash
+# Basic chat with vLLM server (auto-detects model)
+uv run python src/utils/chat_client_enhanced.py
+
+# Connect to specific server (auto-detects model)
+uv run python src/utils/chat_client_enhanced.py --url http://localhost:8000
+
+# Specify model explicitly (optional)
+uv run python src/utils/chat_client_enhanced.py --url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
+```
+
+#### MCP Agent Mode
+
+```bash
+# Enable MCP tools for weather queries (auto-detects model)
+uv run python src/utils/chat_client_enhanced.py --enable-mcp
+
+# Full configuration
+uv run python src/utils/chat_client_enhanced.py \
+  --enable-mcp \
+  --url http://localhost:8000 \
+  --ollama-url http://ollama.mixwarecs-home.net:11434 \
+  --stream \
+  --temperature 0.8
+```
+
+### MCP Tools Available
+
+When MCP mode is enabled, the following tools are available:
+
+- **Weather Queries**: Get current weather, forecasts, and historical data
+- **Location Support**: Supports city names and coordinates
+- **Units**: Celsius or Fahrenheit temperature units
+
+### Example MCP Conversation
+
+```
+✓ Connected to vLLM server at http://localhost:8000
+✓ Auto-selected model: microsoft/Phi-3-mini-4k-instruct
+✓ MCP tools enabled (2 tools available)
+
+╭─ Welcome ─────────────────────────────────────────────────────────────────╮
+│ 🤖 Enhanced vLLM Chat Client (with MCP tools)                             │
+│                                                                           │
+│ Configuration:                                                            │
+│ • Server: http://localhost:8000                                           │
+│ • Model: microsoft/Phi-3-mini-4k-instruct                                 │
+│ • MCP Tools: Enabled                                                      │
+│                                                                           │
+│ Available MCP Tools (2):                                                  │
+│ • weather_get_hourly_weather - Get hourly weather forecast for a location│
+│   using Open-Meteo API (Weather information and forecasts)               │
+│ • weather_geocode_location - Get coordinates and timezone information for│
+│   a location. (Weather information and forecasts)                         │
+│                                                                           │
+│ Commands: /help, /clear, /history, /mcp, /quit                            │
+│ Type your message and press Enter to chat!                                │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+You: What's the weather like in New York?
+╭─ 🌤️ Assistant (with tools) ───────────────────────────────────────────────╮
+│ The user is asking about the weather in New York. I should use the        │
+│ weather_get_weather tool to get current weather information.              │
+│                                                                           │
+│ Tool Call: weather_get_weather(location="New York", units="celsius")      │
+│                                                                           │
+│ Tool Result: [weather] Weather for New York: 22°C, Partly Cloudy, Wind 5  │
+│ km/h                                                                     │
+│                                                                           │
+│ Current weather in New York: 22°C with partly cloudy conditions and light │
+│ winds at 5 km/h.                                                          │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+You: /mcp
+╭─ 🔧 MCP Integration Status ───────────────────────────────────────────────╮
+│ ┏━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓ │
+│ ┃ Server  ┃ Status                                        ┃ Tools       ┃ │
+│ ┡━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩ │
+│ │ weather │ ✓ Connected (2 tools)                         │ get_hourly_ │
+│ │         │                                               │ weather,    │
+│ │         │                                               │ geocode_loc │
+│ │         │                                               │ ation       │
+│ └─────────┴───────────────────────────────────────────────┴─────────────┘ │
+╰────────────────────────────────────────────────────────────────────────────╯
+```
+
+## Dependencies
+
+MCP mode requires additional packages:
+- `langchain-ollama`: Ollama integration for tool-calling models
+- `langchain-core`: Core LangChain functionality
+- `langgraph`: Agent orchestration
+
+If these packages are not available, the client falls back to simple chat mode.
+
+### MCP Configuration
+
+Configure your MCP servers in `configs/mcp_servers.yaml`. The system automatically discovers tools from enabled servers and makes them available to the LLM during conversations.
+
+## MCP Configuration
+
+MCP (Model Context Protocol) servers are configured in `configs/mcp_servers.yaml`. This allows you to add, remove, or modify MCP servers without changing the source code.
+
+### MCP Server Configuration
+
+```yaml
+servers:
+  weather:
+    url: "http://agentgateway.mixwarecs-home.net/weather-mcp"
+    auth_token: "your_auth_token_here"
+    description: "Weather information and forecasts"
+    enabled: true
+
+  # Add more servers as needed
+  database:
+    url: "http://localhost:3001/mcp"
+    auth_token: "db_token_here"
+    description: "Database queries and operations"
+    enabled: false
+
+settings:
+  timeout: 30
+  max_retries: 3
+  auto_discover_tools: true
+```
+
+### MCP Server Fields
+
+- **`url`**: HTTP endpoint of the MCP server
+- **`auth_token`**: Bearer token for authentication (optional)
+- **`description`**: Human-readable description
+- **`enabled`**: Whether this server is active
+
+### Testing MCP Configuration
+
+Test your MCP setup:
+
+```bash
+# Test MCP configuration and connectivity
+uv run python test_mcp.py
+```
+
+**Expected Output:**
+```
+🔧 MCP Integration Test Suite
+==================================================
+Testing MCP Configuration...
+✓ Loaded configuration from: configs/mcp_servers.yaml
+✓ Found 1 configured servers
+✓ Settings: {'timeout': 30, 'max_retries': 3, 'retry_delay': 1.0, 'auto_discover_tools': True}
+
+Testing MCP Server Connectivity...
+Testing weather...
+✓ Connected to weather
+  Tools: 3 (get_weather, get_forecast, get_history)
+  Resources: 0 ()
+```
+
+The system automatically discovers tools from your configured MCP servers. If a server is unreachable, it will be skipped gracefully.
+
