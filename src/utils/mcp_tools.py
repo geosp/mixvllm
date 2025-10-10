@@ -4,8 +4,12 @@ This module provides LangChain tools that wrap MCP server functionality,
 allowing LLMs to call MCP tools during conversations.
 """
 
+import functools
 from typing import Any, Dict, List, Optional
-from mcp_client import get_mcp_config, create_mcp_client, MCPError
+try:
+    from .mcp_client import get_mcp_config, create_mcp_client, MCPError
+except ImportError:
+    from mcp_client import get_mcp_config, create_mcp_client, MCPError
 
 
 # Cache for discovered tools
@@ -32,39 +36,38 @@ def _discover_mcp_tools() -> Dict[str, Any]:
                 # Create a unique tool name combining server and tool name
                 full_tool_name = f"{server_name}_{tool.name}"
 
-                # Create the tool function dynamically
-                async def create_tool_function(server_name=server_name, tool_name=tool.name):
-                    async def tool_function(**kwargs):
+                # Create tool function using a class to avoid closure issues
+                class ToolExecutor:
+                    def __init__(self, server, tool_name):
+                        self.server = server
+                        self.tool_name = tool_name
+                    
+                    async def __call__(self, **kwargs):
                         try:
-                            client = create_mcp_client(server_name)
-                            result = client.call_tool(tool_name, kwargs)
+                            client = create_mcp_client(self.server)
+
+                            # Call the intended MCP tool
+                            result = client.call_tool(self.tool_name, kwargs)
 
                             if result and len(result) > 0:
                                 content = result[0].get("text", "")
-                                return f"[{server_name}] {content}"
+                                return f"[{self.server}] {content}"
                             else:
-                                return f"[{server_name}] Tool executed but returned no result"
+                                return f"[{self.server}] Tool executed but returned no result"
 
                         except MCPError as e:
-                            return f"[{server_name}] Error: {e}"
+                            return f"[{self.server}] Error: {e}"
                         except Exception as e:
-                            return f"[{server_name}] Unexpected error: {e}"
+                            return f"[{self.server}] Unexpected error: {e}"
 
-                    # Set function metadata
-                    tool_function.__name__ = f"{server_name}_{tool_name}"
-                    tool_function.__doc__ = f"{tool.description}\n\nServer: {server_name}"
-
-                    return tool_function
-
-                # Create the actual tool function
-                tool_function = create_tool_function()
+                tool_function = ToolExecutor(server_name, tool.name)
 
                 # Store the tool info
                 _discovered_tools[full_tool_name] = {
                     'function': tool_function,
                     'description': tool.description,
                     'server': server_name,
-                    'tool_name': tool.name,
+                    'tool_name': full_tool_name,
                     'input_schema': tool.input_schema
                 }
 
@@ -128,33 +131,62 @@ def get_available_mcp_tools() -> List[Any]:
                     "model_config": {"arbitrary_types_allowed": True}
                 })
 
-            # Create a custom tool class
-            class MCPTool(BaseTool):
-                name: str = tool_name
-                description: str = f"{tool_info['description']} (Server: {tool_info['server']})"
-                args_schema: Type[BaseModel] = ArgsSchema
+            # Create a dynamic tool class
+            def create_tool_class(t_name, t_info, args_schema):
+                # Create a custom tool class
+                class MCPTool(BaseTool):
+                    name: str = t_name
+                    description: str = f"{t_info['description']} (Server: {t_info['server']})"
+                    args_schema: Type[BaseModel] = ArgsSchema
 
-                def _run(self, **kwargs) -> str:
-                    """Run the tool synchronously."""
-                    try:
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        result = loop.run_until_complete(tool_info['function'](**kwargs))
-                        loop.close()
-                        return result
-                    except Exception as e:
-                        return f"[{tool_info['server']}] Error: {e}"
+                    def _run(self, **kwargs) -> str:
+                        """Run the tool synchronously."""
+                        try:
+                            import asyncio
+                            import concurrent.futures
+                            import threading
+                            
+                            # Check if we're already in an async context
+                            try:
+                                current_loop = asyncio.get_running_loop()
+                                # If we have a running loop, we need to run in a separate thread
+                                def run_in_thread():
+                                    new_loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(new_loop)
+                                    try:
+                                        result = new_loop.run_until_complete(t_info['function'](**kwargs))
+                                        return result
+                                    finally:
+                                        new_loop.close()
+                                
+                                with concurrent.futures.ThreadPoolExecutor() as executor:
+                                    future = executor.submit(run_in_thread)
+                                    return future.result()
+                            except RuntimeError:
+                                # No running loop, safe to create one
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                try:
+                                    result = loop.run_until_complete(t_info['function'](**kwargs))
+                                    return result
+                                finally:
+                                    loop.close()
+                        except Exception as e:
+                            return f"[{t_info['server']}] Error: {e}"
 
-                async def _arun(self, **kwargs) -> str:
-                    """Run the tool asynchronously."""
-                    try:
-                        return await tool_info['function'](**kwargs)
-                    except Exception as e:
-                        return f"[{tool_info['server']}] Error: {e}"
+                    async def _arun(self, **kwargs) -> str:
+                        """Run the tool asynchronously."""
+                        try:
+                            return await t_info['function'](**kwargs)
+                        except Exception as e:
+                            return f"[{t_info['server']}] Error: {e}"
 
+                return MCPTool
+            
+            MCPToolClass = create_tool_class(tool_name, tool_info, ArgsSchema)
+            
             # Create instance of the tool
-            langchain_tool = MCPTool()
+            langchain_tool = MCPToolClass()
             langchain_tools.append(langchain_tool)
 
         return langchain_tools

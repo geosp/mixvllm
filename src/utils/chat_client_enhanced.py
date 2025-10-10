@@ -2,8 +2,7 @@
 """
 Enhanced CLI Chat Client for vLLM Server with MCP Tool Support
 
-A chat client that connects to a running vLLM server and supports MCP tools
-for enhanced functionality like weather queries.
+A chat client that connects to a running vLLM server and supports MCP tools.
 """
 
 import argparse
@@ -11,61 +10,57 @@ import json
 import sys
 from typing import List, Dict, Any, Optional
 import os
-
-# Add the parent directory to the path for imports
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-try:
-    import requests
-except ImportError:
-    print("Error: requests library is required. Install with: pip install requests")
-    sys.exit(1)
-
-try:
-    from prompt_toolkit import PromptSession
-    from prompt_toolkit.history import InMemoryHistory
-    from prompt_toolkit.styles import Style
-    PROMPT_TOOLKIT_AVAILABLE = True
-except ImportError:
-    PROMPT_TOOLKIT_AVAILABLE = False
-
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.text import Text
-    from rich.markdown import Markdown
-    from rich.live import Live
-    from rich.spinner import Spinner
-    from rich.table import Table
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
-
-try:
-    from langchain_ollama import ChatOllama
-    from langgraph.prebuilt import create_react_agent
-    MCP_AVAILABLE = True
-except ImportError:
-    MCP_AVAILABLE = False
+import logging
+import requests
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.styles import Style
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+from rich.markdown import Markdown
+from rich.live import Live
+from rich.spinner import Spinner
+from rich.table import Table
+import openai
 
 
 class ChatClient:
     """Enhanced chat client for vLLM OpenAI-compatible API with MCP tool support."""
 
     def __init__(self, base_url: str = "http://localhost:8000", model: str = None,
-                 enable_mcp: bool = False, ollama_url: str = "http://ollama.mixwarecs-home.net:11434"):
+                 enable_mcp: bool = False, debug: bool = False):
         self.base_url = base_url.rstrip('/')
         self.model = model
-        self.enable_mcp = enable_mcp and MCP_AVAILABLE
-        self.ollama_url = ollama_url
+        self.enable_mcp = enable_mcp
+        self.debug = debug
+        
+        # Set up debug logging if enabled
+        if self.debug:
+            logging.basicConfig(
+                filename='llm_debug.log',
+                level=logging.DEBUG,
+                format='%(asctime)s - %(levelname)s - %(message)s',
+                filemode='w'  # Overwrite each run
+            )
+            self.logger = logging.getLogger('llm_debug')
+        else:
+            self.logger = None
+
         self.conversation_history: List[Dict[str, str]] = []
         self.session = requests.Session()
 
         # Initialize rich console if available
-        self.console = Console() if RICH_AVAILABLE else None
+        self.console = Console() if Console is not None else None
+
+        # Initialize OpenAI client for LLM interactions
+        if openai is not None:
+            self.openai_client = openai.OpenAI(
+                base_url=f"{self.base_url}/v1",
+                api_key="dummy"  # vLLM doesn't require authentication
+            )
+        else:
+            self.openai_client = None
 
         # Initialize MCP agent if enabled
         self.agent = None
@@ -80,19 +75,21 @@ class ChatClient:
         try:
             from mcp_tools import get_available_mcp_tools
 
-            llm = ChatOllama(
-                model="gpt-oss:20b",  # Use a capable model for tool calling
-                base_url=self.ollama_url,
-                temperature=0.1
-            )
-
+            # For now, disable the LangChain agent and use direct MCP tool calling
+            # This avoids complex LangChain integration issues
             tools = get_available_mcp_tools()
-            self.agent = create_react_agent(llm, tools)
+            
+            if not tools:
+                raise ValueError("No MCP tools available")
+            
+            # Store tools for direct calling instead of using LangChain agent
+            self.mcp_tools = {tool.name: tool for tool in tools}
+            self.agent = None  # Will implement direct tool calling
 
             if self.console:
-                self.console.print("[green]✓[/green] MCP tools enabled (weather queries available)")
+                self.console.print(f"[green]✓[/green] MCP tools enabled ({len(tools)} tools available)")
             else:
-                print("✓ MCP tools enabled (weather queries available)")
+                print(f"✓ MCP tools enabled ({len(tools)} tools available)")
 
         except Exception as e:
             if self.console:
@@ -152,81 +149,258 @@ class ChatClient:
         # Add user message to history
         self.conversation_history.append({"role": "user", "content": message})
 
-        # Use MCP agent if enabled, otherwise use direct API
-        if self.enable_mcp and self.agent:
-            return self._chat_with_mcp(message, temperature, max_tokens, stream)
+        # Use MCP tools if enabled and available, otherwise use direct API
+        if self.enable_mcp and hasattr(self, 'mcp_tools') and self.mcp_tools:
+            return self._chat_with_mcp_tools(message, temperature, max_tokens, stream)
         else:
             return self._chat_direct(message, temperature, max_tokens, stream)
 
-    def _chat_with_mcp(self, message: str, temperature: float, max_tokens: int, stream: bool) -> str:
-        """Chat using MCP-enabled agent."""
+    def _chat_with_mcp_tools(self, message: str, temperature: float, max_tokens: int, stream: bool) -> str:
+        """Chat using MCP tools with a single LLM call for tool selection and parameter extraction."""
         try:
-            if self.console and not stream:
-                with self.console.status("[bold green]Agent thinking...", spinner="dots") as status:
-                    result = self.agent.invoke(
-                        {"messages": [{"role": "user", "content": message}]}
-                    )
-            else:
-                result = self.agent.invoke(
-                    {"messages": [{"role": "user", "content": message}]}
-                )
+            # Format tools for the LLM
+            tools_formatted = self._format_tools_for_llm()
+            
+            # Build the system prompt
+            system_prompt = f"""You are a helpful assistant with access to the following tools:
 
-            final_message = result["messages"][-1].content
+{tools_formatted}
 
-            # Add to history
-            self.conversation_history.append({"role": "assistant", "content": final_message})
+When you need to use a tool to answer the user's question, respond with a JSON object in this exact format:
+{{"tool": "tool_name", "parameters": {{"param1": "value1", "param2": "value2"}}}}
 
-            # Display with rich formatting
+If you can answer the question without using any tools, just respond normally with your helpful answer.
+
+Do not mention the tools or JSON format in your normal responses."""
+
+            # Build conversation messages
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # Add conversation history (excluding system messages)
+            for hist_msg in self.conversation_history[:-1]:  # Exclude the current user message
+                if hist_msg["role"] != "system":
+                    messages.append(hist_msg)
+            
+            # Add the current user message
+            messages.append({"role": "user", "content": message})
+            
+            # Log the prompt being sent to LLM if debug enabled
+            if self.debug:
+                self.logger.debug("=== MCP TOOLS PROMPT ===")
+                for msg in messages:
+                    self.logger.debug(f"{msg['role'].upper()}: {msg['content'][:500]}{'...' if len(msg['content']) > 500 else ''}")
+                self.logger.debug("=== END MCP PROMPT ===")
+            
+            # Call the LLM using OpenAI client
             if self.console:
-                if any(marker in final_message.lower() for marker in ['weather', 'temperature', 'forecast']):
-                    # Weather responses get special formatting
-                    self.console.print(Panel(final_message, title="[bold blue]🌤️ Assistant (with tools)[/bold blue]", border_style="blue"))
-                elif "**" in final_message or "* " in final_message:
-                    # Markdown responses
-                    markdown = Markdown(final_message)
-                    self.console.print(Panel(markdown, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
-                else:
-                    self.console.print(Panel(final_message, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                self.console.print(f"[dim]🔧 MCP mode active, sending to LLM with tools...[/dim]")
+            
+            if self.openai_client:
+                response = self.openai_client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                llm_response = response.choices[0].message.content.strip()
+                
+                # Log the LLM response if debug enabled
+                if self.debug:
+                    self.logger.debug("=== MCP TOOLS RESPONSE ===")
+                    self.logger.debug(f"Response: {llm_response[:500]}{'...' if len(llm_response) > 500 else ''}")
+                    self.logger.debug("=== END MCP RESPONSE ===")
             else:
-                print(f"Assistant: {final_message}")
-
-            return final_message
-
+                # Fallback to direct HTTP if OpenAI client not available
+                payload = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                http_response = self.session.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30
+                )
+                if http_response.status_code == 200:
+                    data = http_response.json()
+                    llm_response = data['choices'][0]['message']['content'].strip()
+                    
+                    # Log the LLM response if debug enabled
+                    if self.debug:
+                        self.logger.debug("=== MCP TOOLS RESPONSE (HTTP) ===")
+                        self.logger.debug(f"Response: {llm_response[:500]}{'...' if len(llm_response) > 500 else ''}")
+                        self.logger.debug("=== END MCP RESPONSE ===")
+                else:
+                    error_msg = f"LLM API error: {http_response.status_code}"
+                    if self.console:
+                        self.console.print(f"[red]❌ {error_msg}[/red]")
+                    return f"Error: {error_msg}"
+            
+            # Try to parse as JSON for tool call
+            try:
+                import json
+                tool_call = json.loads(llm_response)
+                if isinstance(tool_call, dict) and "tool" in tool_call and "parameters" in tool_call:
+                    # This is a tool call
+                    tool_name = tool_call["tool"]
+                    params = tool_call["parameters"]
+                    
+                    if self.console:
+                        self.console.print(f"[green]🔧 LLM requested tool: {tool_name} with params: {params}[/green]")
+                    
+                    # Execute the tool
+                    if tool_name in self.mcp_tools:
+                        tool_obj = self.mcp_tools[tool_name]
+                        result = self._execute_tool_direct(tool_obj, params)
+                        if result:
+                            # Display the result
+                            if self.console:
+                                if any(marker in result for marker in ['**', '*', '`', '#', '-', '1.']):
+                                    markdown = Markdown(result)
+                                    self.console.print(Panel(markdown, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                                else:
+                                    self.console.print(Panel(result, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                            else:
+                                print(f"Assistant: {result}")
+                            
+                            # Add to history
+                            self.conversation_history.append({"role": "assistant", "content": result})
+                            return result
+                        else:
+                            result = "Tool execution failed."
+                            if self.console:
+                                self.console.print(Panel(result, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                            else:
+                                print(f"Assistant: {result}")
+                            self.conversation_history.append({"role": "assistant", "content": result})
+                            return result
+                    else:
+                        result = f"Unknown tool: {tool_name}"
+                        if self.console:
+                            self.console.print(Panel(result, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                        else:
+                            print(f"Assistant: {result}")
+                        self.conversation_history.append({"role": "assistant", "content": result})
+                        return result
+                else:
+                    # Not a tool call, return as normal response
+                    # Display the response
+                    if self.console:
+                        if any(marker in llm_response for marker in ['**', '*', '`', '#', '-', '1.']):
+                            markdown = Markdown(llm_response)
+                            self.console.print(Panel(markdown, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                        else:
+                            self.console.print(Panel(llm_response, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                    else:
+                        print(f"Assistant: {llm_response}")
+                    
+                    # Add to history
+                    self.conversation_history.append({"role": "assistant", "content": llm_response})
+                    return llm_response
+            except json.JSONDecodeError:
+                # Not JSON, treat as normal response
+                # Display the response
+                if self.console:
+                    if any(marker in llm_response for marker in ['**', '*', '`', '#', '-', '1.']):
+                        markdown = Markdown(llm_response)
+                        self.console.print(Panel(markdown, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                    else:
+                        self.console.print(Panel(llm_response, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                else:
+                    print(f"Assistant: {llm_response}")
+                
+                # Add to history
+                self.conversation_history.append({"role": "assistant", "content": llm_response})
+                return llm_response
         except Exception as e:
-            error_msg = f"Agent error: {str(e)}"
+            error_msg = f"MCP tools error: {str(e)}"
             if self.console:
                 self.console.print(f"[red]❌ {error_msg}[/red]")
-            else:
-                print(f"❌ {error_msg}")
+            return f"Error: {error_msg}"
+
+    def _execute_tool_direct(self, tool_obj, params: dict) -> Optional[str]:
+        """Execute a tool directly with provided parameters."""
+        try:
+            # Debug: Show which tool we're executing
+            if self.console:
+                self.console.print(f"[dim]🔍 Executing tool: {tool_obj.name if hasattr(tool_obj, 'name') else 'unknown'}[/dim]")
+                self.console.print(f"[dim]🔍 Parameters: {params}[/dim]")
+            
+            # Call the tool's _run method with the parameters
+            result = tool_obj._run(**params)
+            
+            if self.console:
+                self.console.print(f"[dim]🔍 Tool result: {result[:100]}...[/dim]")
+            
+            return str(result)
+            
+        except Exception as e:
+            error_msg = f"Tool execution error: {str(e)}"
+            if self.console:
+                self.console.print(f"[red]❌ {error_msg}[/red]")
             return error_msg
 
     def _chat_direct(self, message: str, temperature: float, max_tokens: int, stream: bool) -> str:
         """Chat using direct vLLM API calls."""
-        # Prepare request
-        payload = {
-            "model": self.model,
-            "messages": self.conversation_history,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": stream
-        }
-
         try:
+            # Debug logging: log the prompt being sent
+            if self.debug:
+                self.logger.debug("=== DIRECT CHAT PROMPT ===")
+                self.logger.debug(f"Temperature: {temperature}, Max tokens: {max_tokens}, Stream: {stream}")
+                for msg in self.conversation_history:
+                    self.logger.debug(f"{msg['role'].upper()}: {msg['content'][:500]}{'...' if len(msg['content']) > 500 else ''}")
+
             if self.console and not stream:
                 with self.console.status("[bold green]Thinking...", spinner="dots") as status:
+                    if self.openai_client:
+                        response = self.openai_client.chat.completions.create(
+                            model=self.model,
+                            messages=self.conversation_history,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            stream=stream
+                        )
+                    else:
+                        # Fallback to direct HTTP
+                        payload = {
+                            "model": self.model,
+                            "messages": self.conversation_history,
+                            "temperature": temperature,
+                            "max_tokens": max_tokens,
+                            "stream": stream
+                        }
+                        response = self.session.post(
+                            f"{self.base_url}/v1/chat/completions",
+                            json=payload,
+                            headers={"Content-Type": "application/json"},
+                            stream=stream
+                        )
+            else:
+                if self.openai_client:
+                    response = self.openai_client.chat.completions.create(
+                        model=self.model,
+                        messages=self.conversation_history,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=stream
+                    )
+                else:
+                    # Fallback to direct HTTP
+                    payload = {
+                        "model": self.model,
+                        "messages": self.conversation_history,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "stream": stream
+                    }
                     response = self.session.post(
                         f"{self.base_url}/v1/chat/completions",
                         json=payload,
                         headers={"Content-Type": "application/json"},
                         stream=stream
                     )
-            else:
-                response = self.session.post(
-                    f"{self.base_url}/v1/chat/completions",
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                    stream=stream
-                )
 
             if response.status_code != 200:
                 error_msg = f"Server error: HTTP {response.status_code}"
@@ -259,9 +433,18 @@ class ChatClient:
     def _handle_regular_response(self, response) -> str:
         """Handle non-streaming response."""
         try:
-            data = response.json()
-            choice = data['choices'][0]
-            assistant_message = choice['message']['content']
+            # Check if this is an OpenAI client response or raw HTTP response
+            if hasattr(response, 'choices'):  # OpenAI client response
+                assistant_message = response.choices[0].message.content
+            else:  # Raw HTTP response
+                data = response.json()
+                choice = data['choices'][0]
+                assistant_message = choice['message']['content']
+
+            # Debug logging: log the response received
+            if self.debug:
+                self.logger.debug("=== DIRECT CHAT RESPONSE ===")
+                self.logger.debug(f"Response: {assistant_message[:500]}{'...' if len(assistant_message) > 500 else ''}")
 
             # Add assistant response to history
             self.conversation_history.append({"role": "assistant", "content": assistant_message})
@@ -297,6 +480,41 @@ class ChatClient:
                     current_text = Text("", style="blue")
                     live.update(Panel(current_text, title="[bold blue]🤖 Assistant (streaming)[/bold blue]", border_style="blue"))
 
+                    # Check if this is OpenAI client streaming or raw HTTP streaming
+                    if hasattr(response, '__iter__') and hasattr(response, '__next__'):  # OpenAI client streaming
+                        for chunk in response:
+                            if chunk.choices[0].delta.content:
+                                delta = chunk.choices[0].delta.content
+                                full_content += delta
+                                current_text.plain = full_content
+                                live.update(Panel(current_text, title="[bold blue]🤖 Assistant (streaming)[/bold blue]", border_style="blue"))
+                    else:  # Raw HTTP streaming
+                        for line in response.iter_lines():
+                            if line:
+                                line = line.decode('utf-8')
+                                if line.startswith('data: '):
+                                    data = line[6:]
+                                    if data == '[DONE]':
+                                        break
+
+                                    try:
+                                        chunk = json.loads(data)
+                                        if chunk['choices'][0]['finish_reason'] is None:
+                                            delta = chunk['choices'][0]['delta'].get('content', '')
+                                            full_content += delta
+                                            current_text.plain = full_content
+                                            live.update(Panel(current_text, title="[bold blue]🤖 Assistant (streaming)[/bold blue]", border_style="blue"))
+                                    except json.JSONDecodeError:
+                                        continue
+            else:
+                # Fallback for no rich - handle both OpenAI and HTTP streaming
+                if hasattr(response, '__iter__') and hasattr(response, '__next__'):  # OpenAI client streaming
+                    for chunk in response:
+                        if chunk.choices[0].delta.content:
+                            delta = chunk.choices[0].delta.content
+                            print(delta, end='', flush=True)
+                            full_content += delta
+                else:  # Raw HTTP streaming
                     for line in response.iter_lines():
                         if line:
                             line = line.decode('utf-8')
@@ -309,30 +527,16 @@ class ChatClient:
                                     chunk = json.loads(data)
                                     if chunk['choices'][0]['finish_reason'] is None:
                                         delta = chunk['choices'][0]['delta'].get('content', '')
+                                        print(delta, end='', flush=True)
                                         full_content += delta
-                                        current_text.plain = full_content
-                                        live.update(Panel(current_text, title="[bold blue]🤖 Assistant (streaming)[/bold blue]", border_style="blue"))
                                 except json.JSONDecodeError:
                                     continue
-            else:
-                # Fallback for no rich
-                for line in response.iter_lines():
-                    if line:
-                        line = line.decode('utf-8')
-                        if line.startswith('data: '):
-                            data = line[6:]
-                            if data == '[DONE]':
-                                break
-
-                            try:
-                                chunk = json.loads(data)
-                                if chunk['choices'][0]['finish_reason'] is None:
-                                    delta = chunk['choices'][0]['delta'].get('content', '')
-                                    print(delta, end='', flush=True)
-                                    full_content += delta
-                            except json.JSONDecodeError:
-                                continue
                 print()  # New line after streaming
+
+            # Debug logging: log the streaming response received
+            if self.debug:
+                self.logger.debug("=== DIRECT CHAT STREAMING RESPONSE ===")
+                self.logger.debug(f"Response: {full_content[:500]}{'...' if len(full_content) > 500 else ''}")
 
             # Add to history
             self.conversation_history.append({"role": "assistant", "content": full_content})
@@ -423,110 +627,127 @@ class ChatClient:
         else:
             if self.console:
                 self.console.print("[yellow]🔧 MCP Integration: Disabled[/yellow]")
-                if not MCP_AVAILABLE:
-                    self.console.print("[dim]Install langchain-ollama, langchain-core, and langgraph to enable MCP tools[/dim]")
-                else:
-                    self.console.print("[dim]Use --enable-mcp to activate MCP tools[/dim]")
+                self.console.print("[dim]MCP tools require proper MCP server configuration[/dim]")
             else:
                 print("🔧 MCP Integration: Disabled")
-                if not MCP_AVAILABLE:
-                    print("Install langchain-ollama, langchain-core, and langgraph to enable MCP tools")
-                else:
-                    print("Use --enable-mcp to activate MCP tools")
+                print("MCP tools require proper MCP server configuration")
+
+    def _format_tools_for_llm(self) -> str:
+        """Format all available MCP tools for inclusion in LLM prompts."""
+        if not hasattr(self, 'mcp_tools') or not self.mcp_tools:
+            return "No tools available."
+        
+        tools_info = []
+        for tool_name, tool_obj in self.mcp_tools.items():
+            # Get tool description
+            description = tool_obj.description if hasattr(tool_obj, 'description') else "No description"
+            
+            # Get parameters from args_schema
+            params_info = []
+            if hasattr(tool_obj, 'args_schema') and tool_obj.args_schema:
+                schema = tool_obj.args_schema
+                fields = None
+                if hasattr(schema, 'model_fields'):
+                    fields = schema.model_fields
+                elif hasattr(schema, '__fields__'):
+                    fields = schema.__fields__
+                
+                if fields:
+                    for field_name, field_info in fields.items():
+                        # Get field type
+                        field_type = str(field_info.annotation).replace('typing.', '')
+                        if hasattr(field_info.annotation, '__name__'):
+                            field_type = field_info.annotation.__name__
+                        
+                        # Check if required
+                        required = getattr(field_info, 'is_required', lambda: True)()
+                        if hasattr(field_info, 'default') and field_info.default is not ...:
+                            required = False
+                        
+                        desc = field_info.description or ""
+                        params_info.append(f"  - {field_name} ({field_type}, {'required' if required else 'optional'}): {desc}")
+            
+            params_str = "\n".join(params_info) if params_info else "  No parameters required"
+            
+            tools_info.append(f"Tool: {tool_name}\nDescription: {description}\nParameters:\n{params_str}")
+        
+        return "\n\n".join(tools_info)
+
+
+def show_welcome(console, model, url, enable_mcp=False, tools_count=0):
+    """Show welcome message with rich formatting."""
+    if console:
+        from rich.panel import Panel
+        from rich.text import Text
+        
+        welcome_text = Text()
+        welcome_text.append("🤖 Enhanced vLLM Chat Client", style="bold blue")
+        if enable_mcp:
+            welcome_text.append(" (with MCP tools)", style="bold green")
+        welcome_text.append("\n\n", style="")
+        welcome_text.append("Configuration:\n", style="bold")
+        welcome_text.append(f"• Server: {url}\n", style="")
+        welcome_text.append(f"• Model: {model}\n", style="")
+        if enable_mcp:
+            welcome_text.append(f"• MCP Tools: Enabled ({tools_count} tools)\n", style="green")
+        else:
+            welcome_text.append("• MCP Tools: Disabled\n", style="")
+        
+        welcome_text.append("\nCommands: /help, /clear, /history", style="dim")
+        if enable_mcp:
+            welcome_text.append(", /mcp", style="dim")
+        welcome_text.append(", /quit\n", style="dim")
+        welcome_text.append("Type your message and press Enter to chat!", style="italic")
+        
+        console.print(Panel(welcome_text, title=":rocket: Welcome", border_style="blue"))
+        
+        if enable_mcp and tools_count > 0:
+            # Show available tools
+            from mcp_tools import get_available_mcp_tools
+            tools = get_available_mcp_tools()
+            if tools:
+                from rich.table import Table
+                table = Table(title="Available MCP Tools", show_header=False)
+                table.add_column("Tool", style="cyan", no_wrap=True)
+                table.add_column("Description", style="white", overflow="fold")
+                
+                for tool in tools:
+                    desc = tool.description[:80] + "..." if len(tool.description) > 80 else tool.description
+                    table.add_row(tool.name, desc)
+                
+                console.print(table)
+    else:
+        print("🤖 Enhanced vLLM Chat Client" + (" (with MCP tools)" if enable_mcp else ""))
+        print()
+        print("Configuration:")
+        print(f"• Server: {url}")
+        print(f"• Model: {model}")
+        if enable_mcp:
+            print(f"• MCP Tools: Enabled ({tools_count} tools)")
+        else:
+            print("• MCP Tools: Disabled")
+        print()
+        print("Commands: /help, /clear, /history" + (", /mcp" if enable_mcp else "") + ", /quit")
+        print("Type your message and press Enter to chat!")
 
 
 def create_prompt_session():
     """Create an enhanced prompt session if available."""
-    if PROMPT_TOOLKIT_AVAILABLE:
-        style = Style.from_dict({
-            'prompt': '#00aa00 bold',
-        })
-        return PromptSession(
-            history=InMemoryHistory(),
-            style=style
-        )
-    else:
-        return None
-
-
-def show_welcome(console: Optional[Console], model: str, url: str, mcp_enabled: bool) -> None:
-    """Show welcome message."""
-    if console:
-        mode = "with MCP tools" if mcp_enabled else "simple chat"
-        welcome_text = f"""
-[bold green]🤖 Enhanced vLLM Chat Client[/bold green] [dim]({mode})[/dim]
-
-[blue]Configuration:[/blue]
-• Server: {url}
-• Model: {model}
-• MCP Tools: {'Enabled' if mcp_enabled else 'Disabled'}
-"""
-
-        # Add MCP tools information if enabled
-        if mcp_enabled:
-            try:
-                from mcp_tools import get_available_mcp_tools, get_mcp_servers
-                tools = get_available_mcp_tools()
-                servers = get_mcp_servers()
-
-                if tools:
-                    welcome_text += f"\n[green]Available MCP Tools ({len(tools)}):[/green]\n"
-                    for tool in tools:
-                        # Get server name from tool name (format: server_toolname)
-                        server_name = tool.name.split('_')[0] if '_' in tool.name else 'unknown'
-                        server_info = servers.get(server_name, {})
-                        server_desc = server_info.get('description', server_name)
-
-                        # Get tool description (first line only for brevity)
-                        tool_desc = tool.description.split('\n')[0] if tool.description else 'No description'
-                        if len(tool_desc) > 60:
-                            tool_desc = tool_desc[:57] + "..."
-
-                        welcome_text += f"• [cyan]{tool.name}[/cyan] - {tool_desc} ([dim]{server_desc}[/dim])\n"
-                else:
-                    welcome_text += "\n[yellow]⚠ No MCP tools available[/yellow]\n"
-            except Exception as e:
-                welcome_text += f"\n[yellow]⚠ MCP tools error: {str(e)[:50]}...[/yellow]\n"
-
-        welcome_text += f"""
-[dim]Commands: /help, /clear, /history, /mcp, /quit[/dim]
-[dim]Type your message and press Enter to chat![/dim]
-        """
-        console.print(Panel(welcome_text.strip(), title="Welcome", border_style="green"))
-    else:
-        mode = "with MCP tools" if mcp_enabled else "simple chat"
-        print("🤖 Enhanced vLLM Chat Client ({mode})")
-        print(f"Server: {url}")
-        print(f"Model: {model}")
-        print(f"MCP Tools: {'Enabled' if mcp_enabled else 'Disabled'}")
-
-        # Add MCP tools information if enabled
-        if mcp_enabled:
-            try:
-                from mcp_tools import get_available_mcp_tools, get_mcp_servers
-                tools = get_available_mcp_tools()
-                servers = get_mcp_servers()
-
-                if tools:
-                    print(f"\nAvailable MCP Tools ({len(tools)}):")
-                    for tool in tools:
-                        server_name = tool.name.split('_')[0] if '_' in tool.name else 'unknown'
-                        server_info = servers.get(server_name, {})
-                        server_desc = server_info.get('description', server_name)
-
-                        # Get tool description (first line only for brevity)
-                        tool_desc = tool.description.split('\n')[0] if tool.description else 'No description'
-                        if len(tool_desc) > 60:
-                            tool_desc = tool_desc[:57] + "..."
-
-                        print(f"  • {tool.name} - {tool_desc} ({server_desc})")
-                else:
-                    print("\n⚠ No MCP tools available")
-            except Exception as e:
-                print(f"\n⚠ MCP tools error: {str(e)[:50]}...")
-
-        print("Commands: /help, /clear, /history, /mcp, /quit")
-        print("-" * 50)
+    if PromptSession is not None:
+        try:
+            # Custom style
+            style = Style.from_dict({
+                'prompt': 'bold cyan',
+            })
+            
+            return PromptSession(
+                history=InMemoryHistory(),
+                style=style,
+                message="You: "
+            )
+        except ImportError:
+            pass
+    return None
 
 
 def main():
@@ -544,7 +765,13 @@ def main():
 
     parser.add_argument(
         '--model',
-        help='Model name (optional - auto-detected from server if not specified)'
+        help='Model name (if not specified, will try to detect from server)'
+    )
+
+    parser.add_argument(
+        '--enable-mcp',
+        action='store_true',
+        help='Enable MCP (Model Context Protocol) tools'
     )
 
     parser.add_argument(
@@ -568,15 +795,9 @@ def main():
     )
 
     parser.add_argument(
-        '--enable-mcp',
+        '--debug',
         action='store_true',
-        help='Enable MCP tool integration (requires LangChain dependencies)'
-    )
-
-    parser.add_argument(
-        '--ollama-url',
-        default='http://ollama.mixwarecs-home.net:11434',
-        help='Ollama server URL for MCP agent'
+        help='Enable debug logging of LLM prompts and responses'
     )
 
     args = parser.parse_args()
@@ -586,7 +807,7 @@ def main():
         base_url=args.url,
         model=args.model,
         enable_mcp=args.enable_mcp,
-        ollama_url=args.ollama_url
+        debug=args.debug
     )
 
     # Auto-detect model if not specified
@@ -605,8 +826,11 @@ def main():
                 print("❌ No models available on server")
             sys.exit(1)
 
+    # Get tools count for welcome message
+    tools_count = len(client.mcp_tools) if hasattr(client, 'mcp_tools') and client.mcp_tools else 0
+
     # Show welcome
-    show_welcome(client.console, client.model, args.url, client.enable_mcp)
+    show_welcome(client.console, client.model, args.url, args.enable_mcp, tools_count)
 
     # Create prompt session
     session = create_prompt_session()
@@ -616,7 +840,7 @@ def main():
             try:
                 if session:
                     # Enhanced input with history
-                    user_input = session.prompt("You: ").strip()
+                    user_input = session.prompt().strip()
                 else:
                     # Basic input
                     user_input = input("You: ").strip()
@@ -635,13 +859,15 @@ def main():
                         break
                     elif cmd == 'help':
                         if client.console:
+                            from rich.table import Table
                             help_table = Table(title="Available Commands")
                             help_table.add_column("Command", style="cyan", no_wrap=True)
                             help_table.add_column("Description", style="white")
                             help_table.add_row("/help", "Show this help message")
                             help_table.add_row("/clear", "Clear conversation history")
                             help_table.add_row("/history", "Show conversation history")
-                            help_table.add_row("/mcp", "Show MCP integration status")
+                            if args.enable_mcp:
+                                help_table.add_row("/mcp", "Show MCP integration status")
                             help_table.add_row("/quit", "Exit the chat")
                             client.console.print(help_table)
                         else:
@@ -649,7 +875,8 @@ def main():
                             print("  /help     - Show this help")
                             print("  /clear    - Clear conversation history")
                             print("  /history  - Show conversation history")
-                            print("  /mcp      - Show MCP integration status")
+                            if args.enable_mcp:
+                                print("  /mcp      - Show MCP integration status")
                             print("  /quit     - Exit the chat")
                         continue
                     elif cmd == 'clear':
@@ -658,7 +885,7 @@ def main():
                     elif cmd == 'history':
                         client.show_history()
                         continue
-                    elif cmd == 'mcp':
+                    elif cmd == 'mcp' and args.enable_mcp:
                         client.show_mcp_status()
                         continue
                     else:

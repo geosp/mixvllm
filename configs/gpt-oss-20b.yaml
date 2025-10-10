@@ -3,15 +3,14 @@
 # NOTE: Requires access to gated repository
 
 model:
-  # name: "microsoft/Phi-3-mini-4k-instruct"  # Smaller model that should fit
-  name: "microsoft/Phi-3-medium-4k-instruct"  # Too large for dual GPU setup
-  # name: "meta-llama/Llama-2-70b-hf"  # Requires HF access approval
+  name: "openai/gpt-oss-20b"
   trust_remote_code: true
 
 inference:
   tensor_parallel_size: 2
-  gpu_memory_utilization: 0.75  # Reduced from 0.9 to avoid OOM
+  gpu_memory_utilization: 0.8
   max_model_len: 4096
+  dtype: bfloat16
 
 server:
   host: "0.0.0.0"

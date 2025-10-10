@@ -63,7 +63,6 @@ def main() -> None:
     parser.add_argument(
         '--dtype',
         type=str,
-        default='float16',
         help='Data type for model weights'
     )
     parser.add_argument(

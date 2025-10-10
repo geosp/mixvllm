@@ -17,6 +17,7 @@ dependencies = [
     "langchain-ollama>=0.1.0",
     "langchain-core>=0.2.0",
     "langgraph>=0.1.0",
+    "openai>=2.2.0",
 ]
 
 [project.optional-dependencies]
@@ -53,3 +54,8 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[dependency-groups]
+dev = [
+    "huggingface-hub[cli]>=0.35.3",
+]
