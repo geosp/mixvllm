@@ -171,6 +171,12 @@ When you need to use a tool to answer the user's question, respond with a JSON o
 
 If you can answer the question without using any tools, just respond normally with your helpful answer.
 
+When presenting tool results to the user, format them as a nice, human-readable report. Include:
+- A header showing which tool function was called and with what parameters
+- Well-formatted, easy-to-read information extracted from the tool results
+- Use appropriate emojis and formatting to make the report visually appealing
+- Do not show raw JSON data - always format it nicely
+
 Do not mention the tools or JSON format in your normal responses."""
 
             # Build conversation messages
@@ -255,19 +261,70 @@ Do not mention the tools or JSON format in your normal responses."""
                         tool_obj = self.mcp_tools[tool_name]
                         result = self._execute_tool_direct(tool_obj, params)
                         if result:
-                            # Display the result
+                            # Now send the raw tool result to LLM for nice formatting
+                            formatting_messages = [
+                                {"role": "system", "content": f"""You are a helpful assistant. The user asked a question and you used a tool to get the answer. 
+
+Format the tool result into a natural, human-readable response. Make it conversational and easy to understand, like you're explaining the information to a friend. Include:
+
+- Which tool function was called and what parameters were used (briefly)
+- The key information from the results in natural language
+- Keep it concise but informative
+- Use simple formatting if needed, but avoid complex tables or charts unless absolutely necessary
+
+Do not show raw JSON data. Provide a natural, conversational response.
+
+Tool call details:
+- Function: {tool_name}
+- Parameters: {params}
+- Raw result: {result}
+
+Respond naturally as if you're answering the user's original question."""},
+                                {"role": "user", "content": f"Please format this tool result naturally: {result}"}
+                            ]
+                            
+                            # Call LLM for formatting
+                            if self.openai_client:
+                                format_response = self.openai_client.chat.completions.create(
+                                    model=self.model,
+                                    messages=formatting_messages,
+                                    temperature=0.3,  # Lower temperature for consistent formatting
+                                    max_tokens=max_tokens,
+                                )
+                                formatted_result = format_response.choices[0].message.content.strip()
+                            else:
+                                # Fallback HTTP call
+                                format_payload = {
+                                    "model": self.model,
+                                    "messages": formatting_messages,
+                                    "temperature": 0.3,
+                                    "max_tokens": max_tokens,
+                                }
+                                format_http_response = self.session.post(
+                                    f"{self.base_url}/v1/chat/completions",
+                                    json=format_payload,
+                                    headers={"Content-Type": "application/json"},
+                                    timeout=30
+                                )
+                                if format_http_response.status_code == 200:
+                                    format_data = format_http_response.json()
+                                    formatted_result = format_data['choices'][0]['message']['content'].strip()
+                                else:
+                                    formatted_result = result  # Fallback to raw result
+                            
+                            # Display the formatted result
                             if self.console:
-                                if any(marker in result for marker in ['**', '*', '`', '#', '-', '1.']):
-                                    markdown = Markdown(result)
+                                if any(marker in formatted_result for marker in ['**', '*', '`', '#', '-', '1.']):
+                                    markdown = Markdown(formatted_result)
                                     self.console.print(Panel(markdown, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
                                 else:
-                                    self.console.print(Panel(result, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
+                                    self.console.print(Panel(formatted_result, title="[bold blue]🤖 Assistant (with tools)[/bold blue]", border_style="blue"))
                             else:
-                                print(f"Assistant: {result}")
+                                print(f"Assistant: {formatted_result}")
                             
                             # Add to history
-                            self.conversation_history.append({"role": "assistant", "content": result})
-                            return result
+                            self.conversation_history.append({"role": "assistant", "content": formatted_result})
+                            return formatted_result
                         else:
                             result = "Tool execution failed."
                             if self.console:
