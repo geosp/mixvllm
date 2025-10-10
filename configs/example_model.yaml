@@ -1,0 +1,31 @@
+# Example vLLM model configuration for dual RTX 3090 Ti setup
+
+model:
+  name: "meta-llama/Llama-2-70b-hf"
+  # For HuggingFace models, set HF_TOKEN environment variable if needed
+  
+inference:
+  tensor_parallel_size: 2          # Use both GPUs
+  max_model_len: 4096              # Maximum context length
+  gpu_memory_utilization: 0.90     # Use 90% of available GPU memory
+  trust_remote_code: true
+  dtype: "float16"                 # or "bfloat16", "float32"
+  quantization: null               # Options: "awq", "gptq", null
+  
+generation:
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 50
+  max_tokens: 512
+  presence_penalty: 0.0
+  frequency_penalty: 0.0
+  
+server:
+  host: "0.0.0.0"
+  port: 8000
+  
+# Example for smaller model (fits on single GPU)
+# model:
+#   name: "meta-llama/Llama-2-13b-hf"
+# inference:
+#   tensor_parallel_size: 1
