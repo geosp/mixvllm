@@ -43,10 +43,11 @@ WORKDIR /app/mixvllm
 # Switch to non-root user
 USER mixvllm
 
-# Set environment variables for CUDA
+# Set environment variables for CUDA and virtual environment
 ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}:/home/mixvllm/.local/bin
+ENV PATH=${CUDA_HOME}/bin:${PATH}:/home/mixvllm/.venv/bin:/home/mixvllm/.local/bin
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV VIRTUAL_ENV=/home/mixvllm/.venv
 
 # Copy the local repository contents into the container
 # We'll do this during the docker build with the context
@@ -55,9 +56,13 @@ COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 # The pyproject.toml already has the README.md reference removed
 # No need to modify it further
 
-# Install the package in development mode for the current user
-# Don't use --system since it requires root privileges
-RUN cd /app/mixvllm && uv pip install -e .
+# Create a virtual environment for the mixvllm user
+RUN uv venv /home/mixvllm/.venv
+
+# Activate the virtual environment and install the package in development mode
+RUN . /home/mixvllm/.venv/bin/activate && \
+    cd /app/mixvllm && \
+    uv pip install -e .
 
 # Make the scripts executable
 RUN chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat

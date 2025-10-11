@@ -3,11 +3,18 @@
 # Strict error handling
 set -e
 
+# Activate virtual environment if it exists
+if [ -f "/home/mixvllm/.venv/bin/activate" ]; then
+  echo "Activating virtual environment..."
+  . /home/mixvllm/.venv/bin/activate
+fi
+
 # Print welcome message
 echo "===== MIXVLLM CONTAINER ENTRYPOINT ====="
 echo "Running as user: $(id)"
 echo "Current directory: $(pwd)"
 echo "Python version: $(python --version 2>&1)"
+echo "Python executable: $(which python)"
 
 # Set up HuggingFace token if provided
 if [ -n "$HF_TOKEN" ]; then
@@ -18,18 +25,17 @@ fi
 
 # Verify that the commands are available
 if ! command -v mixvllm-serve &>/dev/null; then
-  echo "WARNING: mixvllm-serve not found in PATH. Installation may have failed."
+  echo "ERROR: mixvllm-serve not found in PATH. Installation may have failed."
   echo "PATH: $PATH"
-  echo "Checking installed packages:"
-  python -m pip list
-  
-  echo "Attempting to reinstall package..."
-  cd /app/mixvllm
-  uv pip install -e .
+  echo "Installed packages:"
+  python -m pip list | grep -i mix
   
   echo "Adding scripts directory to PATH as a fallback..."
   export PATH=$PATH:/app/mixvllm
-  chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat
+  
+  if ! command -v mixvllm-serve &>/dev/null; then
+    echo "CRITICAL: Still cannot find mixvllm-serve. Please check your installation."
+  fi
 fi
 
 # Simple argument handling
