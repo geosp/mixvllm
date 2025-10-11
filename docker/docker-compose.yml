@@ -29,21 +29,26 @@ services:
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       
-    # No need to override entrypoint since we changed the Dockerfile
+    # Override the entrypoint since the image still has the uv entrypoint
+    entrypoint: ["/bin/bash", "-c"]
 
-    # Run mixvllm server script with improved logging
+    # Run a persistent command that keeps the container running
     command: >
-      echo '==== Starting MixVLLM Container ====' &&
-      echo 'Cloning mixvllm repository...' &&
-      rm -rf /app/mixvllm-local || true &&
-      git clone https://github.com/geosp/mixvllm.git /app/mixvllm-local &&
-      cd /app/mixvllm-local &&
-      echo 'Installing dependencies with uv...' &&
-      uv pip install --system -e . &&
-      echo 'Starting mixvllm server with GPU parallelism...' &&
-      mixvllm-serve \
-        --model gpt-oss-20b \
-        --gpus 2 \
-        --enable-terminal
+      echo "==== Starting MixVLLM Container ====" &&
+      echo "Current directory: $(pwd)"
+      # echo "Cloning mixvllm repository..." &&
+      # rm -rf /app/mixvllm-local || true &&
+      # git clone https://github.com/geosp/mixvllm.git /app/mixvllm-local &&
+      # cd /app/mixvllm-local &&
+      # echo "Changed to directory: $(pwd)" &&
+      # echo "Installing dependencies with uv..." &&
+      # uv pip install --system -e . &&
+      # echo "Checking mixvllm-serve script..." &&
+      # which mixvllm-serve || echo "mixvllm-serve not found in PATH" &&
+      # ls -la $(which mixvllm-serve 2>/dev/null) || echo "Cannot access script file" &&
+      # echo "Checking executable permissions..." &&
+      # cat $(which mixvllm-serve 2>/dev/null) | head -n 10 || echo "Cannot read script file" &&
+      # echo "Starting mixvllm-serve with GPU parallelism..." &&
+      # mixvllm-serve --help || echo "Failed to run script"
 
     restart: unless-stopped
