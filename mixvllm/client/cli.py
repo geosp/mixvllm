@@ -70,7 +70,7 @@ def main():
     parser.add_argument(
         '--max-tokens',
         type=int,
-        default=512,
+        default=4096,
         help='Maximum tokens to generate'
     )
 

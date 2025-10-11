@@ -18,7 +18,7 @@ class UIManager:
         self.console = Console() if Console is not None else None
 
     def show_welcome(self, model: str, tools_count: int = 0):
-        """Show welcome message with rich formatting."""
+        """Show welcome message with clean formatting."""
         if self.console:
             from rich.panel import Panel
             from rich.text import Text
@@ -28,6 +28,7 @@ class UIManager:
             if self.config.enable_mcp:
                 welcome_text.append(" (with MCP tools)", style="bold green")
             welcome_text.append("\n\n", style="")
+            
             welcome_text.append("Configuration:\n", style="bold")
             welcome_text.append(f"• Server: {self.config.base_url}\n", style="")
             welcome_text.append(f"• Model: {model}\n", style="")
@@ -45,20 +46,23 @@ class UIManager:
             welcome_text.append(", /quit\n", style="dim")
             welcome_text.append("Type your message and press Enter to chat!", style="italic")
 
-            self.console.print(Panel(welcome_text, title=":rocket: Welcome", border_style="blue"))
+            self.console.print(Panel(welcome_text, title="🚀 Welcome", border_style="blue"))
 
             if self.config.enable_mcp and tools_count > 0:
-                # Show available tools
+                # Show available tools with simple table
                 from .utils.mcp_tools import get_available_mcp_tools
                 tools = get_available_mcp_tools(self.config.mcp_config_path)
                 if tools:
                     from rich.table import Table
-                    table = Table(title="Available MCP Tools", show_header=False)
+                    table = Table(title="Available MCP Tools", show_header=True)
                     table.add_column("Tool", style="cyan", no_wrap=True)
                     table.add_column("Description", style="white", overflow="fold")
 
                     for tool in tools:
-                        desc = tool.description[:80] + "..." if len(tool.description) > 80 else tool.description
+                        # Truncate long descriptions
+                        desc = tool.description
+                        if len(desc) > 80:
+                            desc = desc[:77] + "..."
                         table.add_row(tool.name, desc)
 
                     self.console.print(table)
@@ -78,6 +82,82 @@ class UIManager:
             print()
             print("Commands: /help, /clear, /history" + (", /mcp" if self.config.enable_mcp else "") + ", /quit")
             print("Type your message and press Enter to chat!")
+
+    def show_status_message(self, message: str, status_type: str = "info"):
+        """Show a status message with appropriate styling."""
+        if self.console:
+            from rich.text import Text
+            
+            # Choose emoji and color based on status type
+            if status_type == "success":
+                emoji = "✅"
+                color = "green"
+            elif status_type == "error":
+                emoji = "❌"
+                color = "red"
+            elif status_type == "warning":
+                emoji = "⚠️"
+                color = "yellow"
+            elif status_type == "info":
+                emoji = "ℹ️"
+                color = "blue"
+            elif status_type == "tool":
+                emoji = "🔧"
+                color = "cyan"
+            else:
+                emoji = "•"
+                color = "white"
+            
+            status_text = Text()
+            status_text.append(f"{emoji} ", style=f"bold {color}")
+            status_text.append(message, style=color)
+            
+            self.console.print(status_text)
+        else:
+            print(f"{message}")
+
+    def show_thinking_indicator(self, message: str = "Thinking..."):
+        """Show a thinking indicator for when the LLM is processing."""
+        if self.console:
+            from rich.text import Text
+            
+            thinking_text = Text()
+            thinking_text.append("🤔 ", style="bold yellow")
+            thinking_text.append(message, style="dim yellow italic")
+            
+            self.console.print(thinking_text)
+        else:
+            print(f"🤔 {message}")
+
+    def show_tool_activity(self, tool_name: str, action: str = "calling"):
+        """Show tool activity status."""
+        if self.console:
+            from rich.text import Text
+            
+            if action == "calling":
+                emoji = "🔧"
+                color = "cyan"
+                message = f"Calling tool: {tool_name}"
+            elif action == "success":
+                emoji = "✅"
+                color = "green"
+                message = f"Tool completed: {tool_name}"
+            elif action == "error":
+                emoji = "❌"
+                color = "red"
+                message = f"Tool failed: {tool_name}"
+            else:
+                emoji = "•"
+                color = "white"
+                message = f"{action}: {tool_name}"
+            
+            tool_text = Text()
+            tool_text.append(f"{emoji} ", style=f"bold {color}")
+            tool_text.append(message, style=f"{color} italic")
+            
+            self.console.print(tool_text)
+        else:
+            print(f"🔧 {action}: {tool_name}")
 
     def show_mcp_status(self):
         """Show MCP integration status."""

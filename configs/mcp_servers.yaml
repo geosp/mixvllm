@@ -10,6 +10,13 @@ servers:
     description: "Weather information and forecasts"
     enabled: true
 
+  bible:
+    # Bible MCP server for scripture queries
+    url: "http://agentgateway.mixwarecs-home.net/bible-mcp"
+    auth_token: "iaOPJQ29pv9gVVepAA89ZCLvM7eDbc4dbPGRxLl6dtLCFxNRNgU5Ygr0hMlP"
+    description: "Bible verses and information"
+    enabled: true
+
   # Example: Add more MCP servers here
   # database:
   #   url: "http://localhost:3001/mcp"

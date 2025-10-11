@@ -15,7 +15,7 @@ class ChatConfig:
     debug: bool = False
     mcp_config_path: Optional[str] = None
     temperature: float = 0.7
-    max_tokens: int = 512
+    max_tokens: int = 4096
     stream: bool = False
 
     def __post_init__(self):
@@ -32,6 +32,6 @@ class ChatConfig:
             debug=getattr(args, 'debug', False),
             mcp_config_path=getattr(args, 'mcp_config', None),
             temperature=getattr(args, 'temperature', 0.7),
-            max_tokens=getattr(args, 'max_tokens', 512),
+            max_tokens=getattr(args, 'max_tokens', 4096),
             stream=getattr(args, 'stream', False)
         )

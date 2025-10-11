@@ -45,7 +45,8 @@ class ChatEngine:
         if openai is not None:
             self.openai_client = openai.OpenAI(
                 base_url=f"{self.config.base_url}/v1",
-                api_key="dummy"  # vLLM doesn't require authentication
+                api_key="dummy",  # vLLM doesn't require authentication
+                timeout=120.0  # 2 minute timeout for long responses
             )
         else:
             self.openai_client = None
@@ -108,7 +109,7 @@ Do not mention the tools or JSON format in your normal responses."""
 
             # Call the LLM using OpenAI client
             if self.console:
-                self.console.print(f"[dim]🔧 MCP mode active, sending to LLM with tools...[/dim]")
+                self.console.print(f"[cyan]🔧 MCP mode active, sending to LLM with tools...[/cyan]")
 
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
@@ -140,7 +141,7 @@ Do not mention the tools or JSON format in your normal responses."""
                     f"{self.config.base_url}/v1/chat/completions",
                     json=payload,
                     headers={"Content-Type": "application/json"},
-                    timeout=30
+                    timeout=120  # Increased timeout for long responses
                 )
                 if http_response.status_code == 200:
                     data = http_response.json()
@@ -171,31 +172,19 @@ Do not mention the tools or JSON format in your normal responses."""
                     params = tool_call["parameters"]
 
                     if self.console:
-                        self.console.print(f"[green]🔧 LLM requested tool: {tool_name} with params: {params}[/green]")
+                        self.console.print(f"[green]🔧 Tool Call: {tool_name} with parameters: {params}[/green]")
 
                     # Execute the tool
                     result = self.tool_manager.execute_tool(tool_name, params)
                     if result:
                         # Now send the raw tool result to LLM for nice formatting
                         formatting_messages = [
-                            {"role": "system", "content": f"""You are a helpful assistant. The user asked a question and you used a tool to get the answer.
+                            {"role": "system", "content": f"""Present the tool result in a helpful way for the user.
 
-Format the tool result into a natural, human-readable response. Make it conversational and easy to understand, like you're explaining the information to a friend. Include:
-
-- Which tool function was called and what parameters were used (briefly)
-- The key information from the results in natural language
-- Keep it concise but informative
-- Use simple formatting if needed, but avoid complex tables or charts unless absolutely necessary
-
-Do not show raw JSON data. Provide a natural, conversational response.
-
-Tool call details:
-- Function: {tool_name}
-- Parameters: {params}
-- Raw result: {result}
-
-Respond naturally as if you're answering the user's original question."""},
-                            {"role": "user", "content": f"Please format this tool result naturally: {result}"}
+Tool: {tool_name}
+Parameters: {params}
+Result: {result}"""},
+                            {"role": "user", "content": message}
                         ]
 
                         # Call LLM for formatting
@@ -204,7 +193,7 @@ Respond naturally as if you're answering the user's original question."""},
                                 model=self.config.model,
                                 messages=formatting_messages,
                                 temperature=0.3,  # Lower temperature for consistent formatting
-                                max_tokens=self.config.max_tokens,
+                                max_tokens=16384,  # Large token limit for long tool results
                             )
                             formatted_result = format_response.choices[0].message.content
                             if formatted_result is None:
@@ -217,13 +206,13 @@ Respond naturally as if you're answering the user's original question."""},
                                 "model": self.config.model,
                                 "messages": formatting_messages,
                                 "temperature": 0.3,
-                                "max_tokens": self.config.max_tokens,
+                                "max_tokens": 16384,  # Large token limit for long tool results
                             }
                             format_http_response = self.session.post(
                                 f"{self.config.base_url}/v1/chat/completions",
                                 json=format_payload,
                                 headers={"Content-Type": "application/json"},
-                                timeout=30
+                                timeout=120  # Increased timeout for long responses
                             )
                             if format_http_response.status_code == 200:
                                 format_data = format_http_response.json()
@@ -301,7 +290,8 @@ Respond naturally as if you're answering the user's original question."""},
                             f"{self.config.base_url}/v1/chat/completions",
                             json=payload,
                             headers={"Content-Type": "application/json"},
-                            stream=self.config.stream
+                            stream=self.config.stream,
+                            timeout=120  # Increased timeout for long responses
                         )
             else:
                 if self.openai_client:
@@ -325,7 +315,8 @@ Respond naturally as if you're answering the user's original question."""},
                         f"{self.config.base_url}/v1/chat/completions",
                         json=payload,
                         headers={"Content-Type": "application/json"},
-                        stream=self.config.stream
+                        stream=self.config.stream,
+                        timeout=120  # Increased timeout for long responses
                     )
 
             # Check for HTTP errors (only for HTTP responses, not OpenAI client responses)
