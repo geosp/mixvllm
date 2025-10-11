@@ -2,7 +2,7 @@
 # Provides NVIDIA CUDA 12.8 runtime with Python 3.11 and UV package manager
 # Suitable for vLLM, MCP servers, and any GPU-accelerated Python applications
 
-FROM nvidia/cuda:12.8.0-cudnn9-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
 LABEL maintainer="Geovanny Fajardo <gffajardo@gmail.com>"
 LABEL description="Universal CUDA 12.8 + Python 3.11 + UV base image for GPU workloads"
