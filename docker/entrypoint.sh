@@ -31,7 +31,7 @@ if ! command -v mixvllm-serve &>/dev/null; then
   
   # We should already be in the correct directory
   echo "Installing from $(pwd)..."
-  uv pip install --user -e .
+  uv pip install -e .
   
   if ! command -v mixvllm-serve &>/dev/null; then
     echo "ERROR: Installation failed. Please check logs."

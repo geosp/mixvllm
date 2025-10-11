@@ -45,7 +45,7 @@ USER mixvllm
 
 # Set environment variables for CUDA
 ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}:${HOME}/.local/bin
+ENV PATH=${CUDA_HOME}/bin:${PATH}:/home/mixvllm/.local/bin
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
 # Copy the local repository contents into the container
@@ -54,7 +54,7 @@ COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 
 # Install dependencies using uv from pyproject.toml
 # This automatically parses the file and installs everything specified
-RUN uv pip install --user -e .
+RUN uv pip install -e .
 
 # Expose common ports
 # 8000: Default vLLM/model server port
