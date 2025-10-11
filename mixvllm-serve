@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# ------------------------------------------------------------
+# mixvllm-serve – wrapper that pulls the right YAML from        #
+# the configs/ directory and forwards everything to uv run     #
+# ------------------------------------------------------------
+set -euo pipefail
+
+# ---- 1. Default config directory --------------------------------
+CONFIG_DIR=${CONFIG_DIR:-configs}
+
+# ---- 2. Make sure HF_TOKEN is exported -------------------------
+if [[ -z "${HF_TOKEN:-}" ]]; then
+  echo "❌  HF_TOKEN is not set.  Export it first: export HF_TOKEN=…"
+  exit 1
+fi
+
+# ---- 3. Parse arguments ----------------------------------------
+MODEL=""
+ARGV=()
+
+while (( $# )); do
+  case "$1" in
+    -m|--model) shift; MODEL="$1"; shift ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: mixvllm-serve --model <name> [-- uv‑options...]
+
+Options:
+  -m, --model   Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
+  -h, --help    Show this help message
+EOF
+      exit 0
+      ;;
+    --) shift; ARGV+=("$@"); break ;;
+    *) ARGV+=("$1"); shift ;;
+  esac
+done
+
+# ---- 4. Handle missing model ------------------------------------
+if [[ -z "$MODEL" ]]; then
+  echo "❌  No model specified." >&2
+  echo "You must provide --model <name>." >&2
+
+  # list available models
+  if [[ -d "$CONFIG_DIR" ]]; then
+    echo "❓  Available models:" >&2
+    find "$CONFIG_DIR" -maxdepth 1 -name '*.yaml' 2>/dev/null |
+      while IFS= read -r f; do
+        base="${f##*/}"
+        base="${base%.yaml}"
+        [[ "$base" == "mcp_servers" ]] && continue
+        echo "      • $base" >&2
+      done
+  else
+    echo "⚠️  Config directory '$CONFIG_DIR' does not exist." >&2
+  fi
+  exit 1
+fi
+
+# ---- 5. Resolve config file ------------------------------------
+CONFIG="$CONFIG_DIR/${MODEL}.yaml"
+
+if [[ ! -f "$CONFIG" ]]; then
+  echo "❌  No config file found for model '$MODEL' (expected '$CONFIG')" >&2
+  exit 1
+fi
+
+# ---- 6. Execute ---------------------------------------------
+echo "🚀  Launching mixvllm-serve with model '$MODEL' → $CONFIG"
+uv run mixvllm-serve --config "$CONFIG" "${ARGV[@]}"
