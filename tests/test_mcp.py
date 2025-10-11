@@ -9,11 +9,11 @@ import sys
 import os
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+# Add mixvllm to path
+sys.path.insert(0, str(Path(__file__).parent))
 
-from utils.mcp_client import get_mcp_config
-from utils.mcp_tools import get_mcp_servers, get_mcp_tool_names, test_mcp_connection
+from mixvllm.utils.mcp_client import get_mcp_config
+from mixvllm.utils.mcp_tools import get_mcp_servers, get_mcp_tool_names, test_mcp_connection
 
 def test_mcp_config():
     """Test MCP configuration loading."""
@@ -69,7 +69,7 @@ def test_mcp_tools():
 
         # Try to get LangChain tools (will fail if LangChain not installed)
         try:
-            from utils.mcp_tools import get_available_mcp_tools
+            from mixvllm.utils.mcp_tools import get_available_mcp_tools
             tools = get_available_mcp_tools()
             print(f"✓ Created {len(tools)} LangChain tools")
         except ImportError:

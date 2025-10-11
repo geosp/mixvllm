@@ -30,12 +30,16 @@ dev = [
     "ipython>=8.12.0",
 ]
 
+[project.scripts]
+mixvllm-serve = "mixvllm.cli.serve_model:main"
+mixvllm-chat = "mixvllm.utils.chat_client_enhanced:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["mixvllm"]
 
 [tool.ruff]
 line-length = 100

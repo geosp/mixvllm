@@ -10,11 +10,11 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+# Add mixvllm to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from inference.config import ServeConfig
-from inference.server import start_server
+from mixvllm.inference.config import ServeConfig
+from mixvllm.inference.server import start_server
 
 
 def main() -> None:

@@ -17,14 +17,14 @@ _discovered_tools = None
 _tool_functions = {}
 
 
-def _discover_mcp_tools() -> Dict[str, Any]:
+def _discover_mcp_tools(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Discover and cache MCP tools from configured servers."""
     global _discovered_tools
     if _discovered_tools is not None:
         return _discovered_tools
 
     _discovered_tools = {}
-    config = get_mcp_config()
+    config = get_mcp_config(config_path)
     servers = config.get_servers()
 
     for server_name, server_config in servers.items():
@@ -79,7 +79,7 @@ def _discover_mcp_tools() -> Dict[str, Any]:
     return _discovered_tools
 
 
-def get_available_mcp_tools() -> List[Any]:
+def get_available_mcp_tools(config_path: Optional[str] = None) -> List[Any]:
     """Get all available MCP tools for LangChain integration."""
     try:
         from langchain_core.tools import BaseTool
@@ -87,7 +87,7 @@ def get_available_mcp_tools() -> List[Any]:
         from typing import Optional, Type
         from pydantic import BaseModel, Field
 
-        tools = _discover_mcp_tools()
+        tools = _discover_mcp_tools(config_path)
         langchain_tools = []
 
         for tool_name, tool_info in tools.items():

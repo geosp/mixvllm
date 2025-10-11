@@ -312,11 +312,11 @@ class MCPError(Exception):
 # Global config instance
 _mcp_config = None
 
-def get_mcp_config() -> MCPConfig:
+def get_mcp_config(config_path: Optional[str] = None) -> MCPConfig:
     """Get the global MCP configuration instance."""
     global _mcp_config
-    if _mcp_config is None:
-        _mcp_config = MCPConfig()
+    if _mcp_config is None or (config_path is not None and str(_mcp_config.config_path) != config_path):
+        _mcp_config = MCPConfig(config_path)
     return _mcp_config
 
 

@@ -29,12 +29,13 @@ class ChatClient:
     """Enhanced chat client for vLLM OpenAI-compatible API with MCP tool support."""
 
     def __init__(self, base_url: str = "http://localhost:8000", model: str = None,
-                 enable_mcp: bool = False, debug: bool = False):
+                 enable_mcp: bool = False, debug: bool = False, mcp_config_path: str = None):
         self.base_url = base_url.rstrip('/')
         self.model = model
         self.enable_mcp = enable_mcp
         self.debug = debug
-        
+        self.mcp_config_path = mcp_config_path
+
         # Set up debug logging if enabled
         if self.debug:
             logging.basicConfig(
@@ -73,11 +74,11 @@ class ChatClient:
     def _setup_mcp_agent(self):
         """Set up the MCP-enabled LangChain agent."""
         try:
-            from mcp_tools import get_available_mcp_tools
+            from .mcp_tools import get_available_mcp_tools
 
             # For now, disable the LangChain agent and use direct MCP tool calling
             # This avoids complex LangChain integration issues
-            tools = get_available_mcp_tools()
+            tools = get_available_mcp_tools(self.mcp_config_path)
             
             if not tools:
                 raise ValueError("No MCP tools available")
@@ -208,7 +209,11 @@ Do not mention the tools or JSON format in your normal responses."""
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
-                llm_response = response.choices[0].message.content.strip()
+                llm_response = response.choices[0].message.content
+                if llm_response is None:
+                    llm_response = ""
+                else:
+                    llm_response = llm_response.strip()
                 
                 # Log the LLM response if debug enabled
                 if self.debug:
@@ -231,7 +236,11 @@ Do not mention the tools or JSON format in your normal responses."""
                 )
                 if http_response.status_code == 200:
                     data = http_response.json()
-                    llm_response = data['choices'][0]['message']['content'].strip()
+                    content = data['choices'][0]['message']['content']
+                    if content is None:
+                        llm_response = ""
+                    else:
+                        llm_response = content.strip()
                     
                     # Log the LLM response if debug enabled
                     if self.debug:
@@ -291,7 +300,11 @@ Respond naturally as if you're answering the user's original question."""},
                                     temperature=0.3,  # Lower temperature for consistent formatting
                                     max_tokens=max_tokens,
                                 )
-                                formatted_result = format_response.choices[0].message.content.strip()
+                                formatted_result = format_response.choices[0].message.content
+                                if formatted_result is None:
+                                    formatted_result = result  # Fallback to raw result
+                                else:
+                                    formatted_result = formatted_result.strip()
                             else:
                                 # Fallback HTTP call
                                 format_payload = {
@@ -308,7 +321,11 @@ Respond naturally as if you're answering the user's original question."""},
                                 )
                                 if format_http_response.status_code == 200:
                                     format_data = format_http_response.json()
-                                    formatted_result = format_data['choices'][0]['message']['content'].strip()
+                                    content = format_data['choices'][0]['message']['content']
+                                    if content is None:
+                                        formatted_result = result  # Fallback to raw result
+                                    else:
+                                        formatted_result = content.strip()
                                 else:
                                     formatted_result = result  # Fallback to raw result
                             
@@ -459,7 +476,8 @@ Respond naturally as if you're answering the user's original question."""},
                         stream=stream
                     )
 
-            if response.status_code != 200:
+            # Check for HTTP errors (only for HTTP responses, not OpenAI client responses)
+            if not hasattr(response, 'choices') and response.status_code != 200:
                 error_msg = f"Server error: HTTP {response.status_code}"
                 try:
                     error_data = response.json()
@@ -497,6 +515,10 @@ Respond naturally as if you're answering the user's original question."""},
                 data = response.json()
                 choice = data['choices'][0]
                 assistant_message = choice['message']['content']
+            
+            # Handle None content
+            if assistant_message is None:
+                assistant_message = ""
 
             # Debug logging: log the response received
             if self.debug:
@@ -760,7 +782,7 @@ def show_welcome(console, model, url, enable_mcp=False, tools_count=0):
         
         if enable_mcp and tools_count > 0:
             # Show available tools
-            from mcp_tools import get_available_mcp_tools
+            from .mcp_tools import get_available_mcp_tools
             tools = get_available_mcp_tools()
             if tools:
                 from rich.table import Table
@@ -815,9 +837,9 @@ def main():
     )
 
     parser.add_argument(
-        '--url',
+        '--base-url',
         default='http://localhost:8000',
-        help='vLLM server URL'
+        help='vLLM server base URL'
     )
 
     parser.add_argument(
@@ -829,6 +851,11 @@ def main():
         '--enable-mcp',
         action='store_true',
         help='Enable MCP (Model Context Protocol) tools'
+    )
+
+    parser.add_argument(
+        '--mcp-config',
+        help='Path to MCP servers configuration file'
     )
 
     parser.add_argument(
@@ -861,10 +888,11 @@ def main():
 
     # Initialize client
     client = ChatClient(
-        base_url=args.url,
+        base_url=args.base_url,
         model=args.model,
         enable_mcp=args.enable_mcp,
-        debug=args.debug
+        debug=args.debug,
+        mcp_config_path=args.mcp_config
     )
 
     # Auto-detect model if not specified
@@ -887,7 +915,7 @@ def main():
     tools_count = len(client.mcp_tools) if hasattr(client, 'mcp_tools') and client.mcp_tools else 0
 
     # Show welcome
-    show_welcome(client.console, client.model, args.url, args.enable_mcp, tools_count)
+    show_welcome(client.console, client.model, args.base_url, args.enable_mcp, tools_count)
 
     # Create prompt session
     session = create_prompt_session()

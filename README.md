@@ -126,28 +126,28 @@ Serve vLLM models with the `serve_model.py` script, which provides an OpenAI-com
 
 ```bash
 # Serve Phi-3 Mini on single GPU
-uv run python serve_model.py --model microsoft/Phi-3-mini-4k-instruct --gpus 1
+uv run mixvllm-serve --model microsoft/Phi-3-mini-4k-instruct --gpus 1
 
 # Serve Llama 2 70B with tensor parallelism
-uv run python serve_model.py --model meta-llama/Llama-2-70b-hf --gpus 2 --trust-remote-code
+uv run mixvllm-serve --model meta-llama/Llama-2-70b-hf --gpus 2 --trust-remote-code
 ```
 
 ### Using Configuration Files
 
 ```bash
 # Use predefined configurations
-uv run python serve_model.py --config configs/phi3-mini.yaml
-uv run python serve_model.py --config configs/llama-7b.yaml
-uv run python serve_model.py --config configs/llama-70b-tp2.yaml
+uv run mixvllm-serve --config configs/phi3-mini.yaml
+uv run mixvllm-serve --config configs/llama-7b.yaml
+uv run mixvllm-serve --config configs/llama-70b-tp2.yaml
 
 # Override config with CLI options
-uv run python serve_model.py --config configs/phi3-mini.yaml --port 8080
+uv run mixvllm-serve --config configs/phi3-mini.yaml --port 8080
 ```
 
 ### Advanced Options
 
 ```bash
-uv run python serve_model.py \
+uv run mixvllm-serve \
   --model meta-llama/Llama-2-70b-hf \
   --gpus 2 \
   --gpu-memory 0.85 \
@@ -176,20 +176,20 @@ curl http://localhost:8000/v1/chat/completions \
 
 ## Chat Client
 
-The included `src/utils/chat_client.py` provides a simple CLI chat interface for interactive conversations with your served models. It features rich terminal formatting and enhanced input handling similar to modern CLI applications.
+The `mixvllm-chat` command provides a CLI chat interface for interactive conversations with your served models. It features rich terminal formatting and enhanced input handling similar to modern CLI applications.
 
 ```bash
 # Install dependencies (if not already done)
 uv sync
 
 # Start chatting with default settings
-uv run python src/utils/chat_client.py
+uv run mixvllm-chat
 
 # Connect to specific server and model
-uv run python src/utils/chat_client.py --url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
+uv run mixvllm-chat --base-url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
 
 # Enable streaming responses
-uv run python src/utils/chat_client.py --stream --temperature 0.8
+uv run mixvllm-chat --stream --temperature 0.8
 ```
 
 ### Chat Client Features
@@ -283,7 +283,7 @@ You: /quit
 
 ## Enhanced Chat Client with MCP Tools
 
-The `src/utils/chat_client_enhanced.py` provides an advanced chat client with MCP (Model Context Protocol) tool integration, enabling the LLM to call external tools during conversations.
+The `mixvllm-chat` command provides an advanced chat client with MCP (Model Context Protocol) tool integration, enabling the LLM to call external tools during conversations.
 
 ### Features
 
@@ -311,26 +311,26 @@ uv sync
 
 ```bash
 # Basic chat with vLLM server (auto-detects model)
-uv run python src/utils/chat_client_enhanced.py
+uv run mixvllm-chat
 
 # Connect to specific server (auto-detects model)
-uv run python src/utils/chat_client_enhanced.py --url http://localhost:8000
+uv run mixvllm-chat --base-url http://localhost:8000
 
 # Specify model explicitly (optional)
-uv run python src/utils/chat_client_enhanced.py --url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
+uv run mixvllm-chat --base-url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
 ```
 
 #### MCP Agent Mode
 
 ```bash
 # Enable MCP tools for weather queries (auto-detects model)
-uv run python src/utils/chat_client_enhanced.py --enable-mcp
+uv run mixvllm-chat --enable-mcp
 
-# Full configuration
-uv run python src/utils/chat_client_enhanced.py \
+# Full configuration with custom MCP config
+uv run mixvllm-chat \
   --enable-mcp \
-  --url http://localhost:8000 \
-  --ollama-url http://ollama.mixwarecs-home.net:11434 \
+  --mcp-config configs/mcp_servers.yaml \
+  --base-url http://localhost:8000 \
   --stream \
   --temperature 0.8
 ```
@@ -448,7 +448,7 @@ Test your MCP setup:
 
 ```bash
 # Test MCP configuration and connectivity
-uv run python test_mcp.py
+uv run python tests/test_mcp.py
 ```
 
 **Expected Output:**
