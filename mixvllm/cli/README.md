@@ -512,9 +512,9 @@ graph LR
     E --> F[Model Weights]
     E --> G[HTTP Server]
     G --> H[API Endpoints]
-    H --> I[/v1/completions]
-    H --> J[/v1/chat/completions]
-    H --> K[/health]
+    H --> I["v1/completions"]
+    H --> J["v1/chat/completions"]
+    H --> K["health"]
 ```
 
 ## Integration
