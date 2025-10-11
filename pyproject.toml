@@ -32,7 +32,7 @@ dev = [
 
 [project.scripts]
 mixvllm-serve = "mixvllm.cli.serve_model:main"
-mixvllm-chat = "mixvllm.utils.chat_client_enhanced:main"
+mixvllm-chat = "mixvllm.client:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -37,15 +37,32 @@ source .venv/bin/activate
 ```
 .
 ├── create_project.sh     # Project bootstrap script
-├── .claude/              # Temporary and experimental code
-│   ├── experiments/      # Model testing and prototyping
-│   ├── benchmarks/       # Performance benchmarks
-│   └── scratch/          # Quick tests and scratchpad
-├── src/                  # Production code
-│   ├── inference/        # vLLM inference wrappers
-│   └── utils/            # Shared utilities
+├── mixvllm/              # Main package
+│   ├── cli/              # Model serving CLI
+│   │   ├── serve_model.py
+│   │   └── README.md
+│   ├── client/           # Chat client
+│   │   ├── chat_client.py
+│   │   ├── chat_engine.py
+│   │   ├── cli.py
+│   │   ├── config.py
+│   │   ├── connection_manager.py
+│   │   ├── history_manager.py
+│   │   ├── response_handler.py
+│   │   ├── tool_manager.py
+│   │   ├── ui_manager.py
+│   │   ├── utils/         # MCP tools and utilities
+│   │   └── README.md
+│   └── inference/        # vLLM inference wrappers
+│       ├── config.py
+│       ├── server.py
+│       └── utils.py
 ├── configs/              # Model and server configurations
-└── tests/                # Test suite
+├── tests/                # Test suite
+└── .claude/              # Temporary and experimental code
+    ├── experiments/      # Model testing and prototyping
+    ├── benchmarks/       # Performance benchmarks
+    └── scratch/          # Quick tests and scratchpad
 ```
 
 ## Quick Start
@@ -89,13 +106,13 @@ See `configs/example_model.yaml` for a complete configuration template.
 uv run pytest
 
 # Type checking
-uv run mypy src/
+uv run mypy mixvllm/
 
 # Linting
-uv run ruff check src/
+uv run ruff check mixvllm/
 
 # Auto-formatting
-uv run black src/
+uv run black mixvllm/
 ```
 
 ## Tensor Parallelism Notes
