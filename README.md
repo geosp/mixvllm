@@ -118,6 +118,49 @@ With 2x RTX 3090 Ti (24GB each = 48GB total):
 - Verify both GPUs are being used
 - Ensure PCIe link is running at full speed
 
+**401 Unauthorized Errors:**
+- Set `HF_TOKEN` environment variable with your HuggingFace token
+- For gated models, request access on the HuggingFace model page
+- Verify token has read permissions: `huggingface-cli whoami`
+- Some models require accepting terms/conditions on HuggingFace
+
+## Authentication
+
+Some models require authentication to access from HuggingFace. If you encounter `401 Unauthorized` errors, you need to:
+
+### HuggingFace Token Setup
+
+1. **Get a token**: Visit https://huggingface.co/settings/tokens to create an access token
+2. **Set environment variable**:
+   ```bash
+   export HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxx
+   ```
+3. **Or login via CLI**:
+   ```bash
+   huggingface-cli login
+   ```
+
+### Gated Models
+
+Some models (especially from OpenAI, Meta, etc.) are **gated repositories** that require:
+- ✅ Valid HuggingFace account
+- ✅ Explicit access approval on the model page
+- ✅ Proper authentication token
+
+**Example with authentication:**
+```bash
+HF_TOKEN=$HF_TOKEN uv run mixvllm-serve --config configs/gpt-oss-20b.yaml
+```
+
+**Models that may require authentication:**
+- `openai/gpt-oss-20b` (gated)
+- `meta-llama/Llama-2-*` (gated)
+- `meta-llama/Llama-3-*` (gated)
+
+**Public models (no auth required):**
+- `microsoft/Phi-3-mini-4k-instruct`
+- Most Microsoft and Google models
+
 ## Model Serving
 
 Serve vLLM models with the `serve_model.py` script, which provides an OpenAI-compatible API server.
@@ -125,20 +168,21 @@ Serve vLLM models with the `serve_model.py` script, which provides an OpenAI-com
 ### Basic Usage
 
 ```bash
-# Serve Phi-3 Mini on single GPU
+# Serve Phi-3 Mini on single GPU (no auth required)
 uv run mixvllm-serve --model microsoft/Phi-3-mini-4k-instruct --gpus 1
 
-# Serve Llama 2 70B with tensor parallelism
-uv run mixvllm-serve --model meta-llama/Llama-2-70b-hf --gpus 2 --trust-remote-code
+# Serve Llama 2 70B with tensor parallelism (requires HF_TOKEN)
+HF_TOKEN=$HF_TOKEN uv run mixvllm-serve --model meta-llama/Llama-2-70b-hf --gpus 2 --trust-remote-code
 ```
 
 ### Using Configuration Files
 
 ```bash
 # Use predefined configurations
-uv run mixvllm-serve --config configs/phi3-mini.yaml
-uv run mixvllm-serve --config configs/llama-7b.yaml
-uv run mixvllm-serve --config configs/llama-70b-tp2.yaml
+uv run mixvllm-serve --config configs/phi3-mini.yaml          # No auth required
+uv run mixvllm-serve --config configs/llama-7b.yaml           # May require HF_TOKEN
+HF_TOKEN=$HF_TOKEN uv run mixvllm-serve --config configs/llama-70b-tp2.yaml  # Requires HF_TOKEN
+HF_TOKEN=$HF_TOKEN uv run mixvllm-serve --config configs/gpt-oss-20b.yaml    # Requires HF_TOKEN
 
 # Override config with CLI options
 uv run mixvllm-serve --config configs/phi3-mini.yaml --port 8080
@@ -147,7 +191,7 @@ uv run mixvllm-serve --config configs/phi3-mini.yaml --port 8080
 ### Advanced Options
 
 ```bash
-uv run mixvllm-serve \
+HF_TOKEN=$HF_TOKEN uv run mixvllm-serve \
   --model meta-llama/Llama-2-70b-hf \
   --gpus 2 \
   --gpu-memory 0.85 \
@@ -394,78 +438,4 @@ You: /mcp
 │ └─────────┴───────────────────────────────────────────────┴─────────────┘ │
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
-
-## Dependencies
-
-MCP mode requires additional packages:
-- `langchain-ollama`: Ollama integration for tool-calling models
-- `langchain-core`: Core LangChain functionality
-- `langgraph`: Agent orchestration
-
-If these packages are not available, the client falls back to simple chat mode.
-
-### MCP Configuration
-
-Configure your MCP servers in `configs/mcp_servers.yaml`. The system automatically discovers tools from enabled servers and makes them available to the LLM during conversations.
-
-## MCP Configuration
-
-MCP (Model Context Protocol) servers are configured in `configs/mcp_servers.yaml`. This allows you to add, remove, or modify MCP servers without changing the source code.
-
-### MCP Server Configuration
-
-```yaml
-servers:
-  weather:
-    url: "http://agentgateway.mixwarecs-home.net/weather-mcp"
-    auth_token: "your_auth_token_here"
-    description: "Weather information and forecasts"
-    enabled: true
-
-  # Add more servers as needed
-  database:
-    url: "http://localhost:3001/mcp"
-    auth_token: "db_token_here"
-    description: "Database queries and operations"
-    enabled: false
-
-settings:
-  timeout: 30
-  max_retries: 3
-  auto_discover_tools: true
-```
-
-### MCP Server Fields
-
-- **`url`**: HTTP endpoint of the MCP server
-- **`auth_token`**: Bearer token for authentication (optional)
-- **`description`**: Human-readable description
-- **`enabled`**: Whether this server is active
-
-### Testing MCP Configuration
-
-Test your MCP setup:
-
-```bash
-# Test MCP configuration and connectivity
-uv run python tests/test_mcp.py
-```
-
-**Expected Output:**
-```
-🔧 MCP Integration Test Suite
-==================================================
-Testing MCP Configuration...
-✓ Loaded configuration from: configs/mcp_servers.yaml
-✓ Found 1 configured servers
-✓ Settings: {'timeout': 30, 'max_retries': 3, 'retry_delay': 1.0, 'auto_discover_tools': True}
-
-Testing MCP Server Connectivity...
-Testing weather...
-✓ Connected to weather
-  Tools: 3 (get_weather, get_forecast, get_history)
-  Resources: 0 ()
-```
-
-The system automatically discovers tools from your configured MCP servers. If a server is unreachable, it will be skipped gracefully.
 
