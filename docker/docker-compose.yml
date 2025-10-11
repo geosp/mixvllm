@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mixvllm-server:
+    # Use pre-built image from GitHub Container Registry
+    image: ghcr.io/geosp/mixvllm:latest
+
+    container_name: mixvllm-server
+
+    # GPU configuration
+    # Docker will make all GPUs available to the container
+    # Edit GPU_COUNT below to control how many GPUs vLLM uses (tensor_parallel_size)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Port mappings
+    ports:
+      - "8000:8000"   # Model server API
+      - "8888:8888"   # Web terminal
+
+    # Environment variables
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - NVIDIA_VISIBLE_DEVICES=all
+      # GPU_COUNT: Number of GPUs for vLLM tensor parallelism
+      # Edit this value directly (1, 2, etc.) or override at runtime: GPU_COUNT=1 docker compose up
+      - GPU_COUNT=2
+
+    # Volume for HuggingFace model cache
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+
+    # Run mixvllm server
+    # Environment variables to customize:
+    #   MODEL=phi3-mini           (default: gpt-oss-20b)
+    #   GPU_COUNT=1               (default: 2)
+    #   ENABLE_TERMINAL=""        (default: enabled)
+    command: >
+      run bash ./mixvllm-serve
+      --model ${MODEL:-gpt-oss-20b}
+      --gpus ${GPU_COUNT}
+      ${ENABLE_TERMINAL:---enable-terminal}
+
+    restart: unless-stopped

@@ -1,0 +1,68 @@
+# Git repository files
+.git/
+.gitignore
+.gitattributes
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+
+# UV lock file (will be regenerated in container)
+# Uncomment if you want to include it:
+# uv.lock
+
+# Model cache (too large, mount as volume instead)
+.cache/
+*.pt
+*.bin
+*.safetensors
+
+# Temporary files
+tmp/
+temp/
+*.tmp
