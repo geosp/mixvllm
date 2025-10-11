@@ -64,8 +64,8 @@ RUN . /home/mixvllm/.venv/bin/activate && \
     cd /app/mixvllm && \
     uv pip install -e .
 
-# Make the scripts executable
-RUN chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat
+# Make the convenience scripts executable
+RUN chmod +x /app/mixvllm/serve /app/mixvllm/chat
 
 # Add the scripts to the PATH
 ENV PATH=${PATH}:/app/mixvllm
@@ -77,8 +77,8 @@ ENV PATH=${PATH}:/app/mixvllm
 EXPOSE 8000 8888 3000
 
 # Verify the installation and path
-RUN which mixvllm-serve && \
-    which mixvllm-chat && \
+RUN ls -la /app/mixvllm/serve && \
+    ls -la /app/mixvllm/chat && \
     echo "PATH: $PATH"
 
 # Verify and make the entrypoint script executable

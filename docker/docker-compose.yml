@@ -35,8 +35,11 @@ services:
     # Option 1: Just keep the container running (default)
     command: tail -f /dev/null
     
-    # Option 2: Start mixvllm server automatically (uncomment to use)
-    # command: mixvllm-serve --model-config configs/gpt-oss-20b.yaml
+    # Option 2: Start server automatically with convenience script (uncomment to use)
+    # command: serve --model phi3-mini --terminal
+    
+    # Option 3: Start server with Python entry point directly (uncomment to use)
+    # command: mixvllm-serve --model-config configs/phi3-mini.yaml
     
     restart: unless-stopped
     

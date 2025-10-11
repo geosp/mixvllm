@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# mixvllm‑chat – tiny wrapper that
+# chat – tiny wrapper that
 #   * gives a default base‑URL
 #   * never enables MCP unless the user requests it
 #   * if MCP is enabled, the corresponding config file is automatically added
@@ -10,7 +10,7 @@
 # `uv run mixvllm‑chat`.
 #
 # Usage:
-#   ./mixvllm‑chat [--base-url URL] [--enable-mcp] [--mcp-config FILE] [Other args…]
+#   ./chat [--base-url URL] [--enable-mcp] [--mcp-config FILE] [Other args…]
 #
 #   - If you don't mention --enable‑mcp, the chat server will run **without**
 #     MCP and the config file will never be added.
@@ -37,7 +37,7 @@ while (( $# )); do
     case "$1" in
         -h|--help)
             cat <<'EOF'
-Usage: mixvllm-chat [--base-url URL] [--enable-mcp] [--mcp-config FILE] [Other args…]
+Usage: chat [--base-url URL] [--enable-mcp] [--mcp-config FILE] [Other args…]
 
 Options
   --base-url URL        Override the default server URL

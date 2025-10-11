@@ -24,25 +24,21 @@ if [ -n "$HF_TOKEN" ]; then
 fi
 
 # Verify that the commands are available
-if ! command -v mixvllm-serve &>/dev/null; then
-  echo "ERROR: mixvllm-serve not found in PATH. Installation may have failed."
+if [ ! -f "/app/mixvllm/serve" ] || [ ! -f "/app/mixvllm/chat" ]; then
+  echo "ERROR: Convenience scripts not found. Installation may have failed."
   echo "PATH: $PATH"
-  echo "Installed packages:"
-  python -m pip list | grep -i mix
+  echo "Checking for scripts:"
+  ls -la /app/mixvllm/
   
   echo "Adding scripts directory to PATH as a fallback..."
   export PATH=$PATH:/app/mixvllm
-  
-  if ! command -v mixvllm-serve &>/dev/null; then
-    echo "CRITICAL: Still cannot find mixvllm-serve. Please check your installation."
-  fi
 fi
 
 # Simple argument handling
 if [ "$#" -eq 0 ] || [ "$1" = "tail" ] && [ "$2" = "-f" ] && [ "$3" = "/dev/null" ]; then
   # Default behavior: keep container running
   echo "Container is running in idle mode."
-  echo "Use 'docker exec -it mixvllm-server /app/mixvllm/mixvllm-serve' to start the server."
+  echo "Use 'docker exec -it mixvllm-server /app/mixvllm/serve --model <model-name>' to start the server."
   echo "Or specify a command in docker-compose.yml."
   
   # Keep container running

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------
-# mixvllm-serve – wrapper that pulls the right YAML from        #
-# the configs/ directory and forwards everything to uv run     #
+# serve – wrapper that pulls the right YAML from the configs/ #
+# directory and forwards everything to the mixvllm-serve cmd  #
 # ------------------------------------------------------------
 set -euo pipefail
 
@@ -23,7 +23,7 @@ while (( $# )); do
     -m|--model) shift; MODEL="$1"; shift ;;
     -h|--help)
       cat <<'EOF'
-Usage: mixvllm-serve --model <name> [OPTIONS...]
+Usage: serve --model <n> [OPTIONS...]
 
 Options:
   -m, --model              Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
@@ -38,13 +38,13 @@ Any other options are passed through to the underlying mixvllm-serve command.
 
 Examples:
   # Serve model with web terminal enabled
-  ./mixvllm-serve --model phi3-mini --terminal
+  ./serve --model phi3-mini --terminal
 
   # Custom terminal port
-  ./mixvllm-serve --model phi3-mini --terminal --terminal-port 9000
+  ./serve --model phi3-mini --terminal --terminal-port 9000
 
   # Terminal without auto-starting chat
-  ./mixvllm-serve --model phi3-mini --terminal --no-terminal-auto-chat
+  ./serve --model phi3-mini --terminal --no-terminal-auto-chat
 EOF
       exit 0
       ;;
@@ -70,7 +70,7 @@ done
 # ---- 4. Handle missing model ------------------------------------
 if [[ -z "$MODEL" ]]; then
   echo "❌  No model specified." >&2
-  echo "You must provide --model <name>." >&2
+  echo "You must provide --model <n>." >&2
 
   # list available models
   if [[ -d "$CONFIG_DIR" ]]; then
