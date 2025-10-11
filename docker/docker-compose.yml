@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mixvllm-server:
     # Use pre-built image from GitHub Container Registry
@@ -9,7 +7,6 @@ services:
 
     # GPU configuration
     # Docker will make all GPUs available to the container
-    # Edit GPU_COUNT below to control how many GPUs vLLM uses (tensor_parallel_size)
     deploy:
       resources:
         reservations:
@@ -27,31 +24,26 @@ services:
     environment:
       - HF_TOKEN=${HF_TOKEN}
       - NVIDIA_VISIBLE_DEVICES=all
-      # GPU_COUNT: Number of GPUs for vLLM tensor parallelism
-      # Edit this value directly (1, 2, etc.) or override at runtime: GPU_COUNT=1 docker compose up
-      - GPU_COUNT=2
 
     # Volume for HuggingFace model cache
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+      
+    # No need to override entrypoint since we changed the Dockerfile
 
-    # Run mixvllm server
-    # Environment variables to customize:
-    #   MODEL=phi3-mini           (default: gpt-oss-20b)
-    #   GPU_COUNT=1               (default: 2)
-    #   ENABLE_TERMINAL=""        (default: enabled)
+    # Run mixvllm server script with improved logging
     command: >
-      bash -c "
-        echo 'Cloning mixvllm repository...' &&
-        git clone https://github.com/geosp/mixvllm.git /app/mixvllm-local &&
-        cd /app/mixvllm-local &&
-        echo 'Installing dependencies...' &&
-        uv pip install --system -e . &&
-        echo 'Starting mixvllm server...' &&
-        mixvllm-serve
-          --model ${MODEL:-gpt-oss-20b}
-          --gpus ${GPU_COUNT}
-          ${ENABLE_TERMINAL:---enable-terminal}
-      "
+      echo '==== Starting MixVLLM Container ====' &&
+      echo 'Cloning mixvllm repository...' &&
+      rm -rf /app/mixvllm-local || true &&
+      git clone https://github.com/geosp/mixvllm.git /app/mixvllm-local &&
+      cd /app/mixvllm-local &&
+      echo 'Installing dependencies with uv...' &&
+      uv pip install --system -e . &&
+      echo 'Starting mixvllm server with GPU parallelism...' &&
+      mixvllm-serve \
+        --model gpt-oss-20b \
+        --gpus 2 \
+        --enable-terminal
 
     restart: unless-stopped

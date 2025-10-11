@@ -51,12 +51,12 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
-# Default entrypoint uses uv for running commands
-# This can be overridden in docker-compose or docker run
-# Examples:
-#   docker run image uv run python script.py
+# Default entrypoint uses bash for more flexible command execution
+# UV is still available in the container for package management:
 #   docker run image uv pip install package
-ENTRYPOINT ["uv"]
+#   docker run image uv run python script.py
+ENTRYPOINT ["/bin/bash", "-c"]
 
 # Default command (can be overridden)
-CMD ["--help"]
+# Just echoes a help message if no command is provided
+CMD ["echo 'MixVLLM Container: Specify a command to run. UV is available for package management.'"]
