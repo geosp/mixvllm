@@ -23,6 +23,10 @@ if ! command -v mixvllm-serve &>/dev/null; then
   echo "Checking installed packages:"
   python -m pip list
   
+  echo "Attempting to reinstall package..."
+  cd /app/mixvllm
+  uv pip install -e .
+  
   echo "Adding scripts directory to PATH as a fallback..."
   export PATH=$PATH:/app/mixvllm
   chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat

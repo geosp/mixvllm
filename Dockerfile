@@ -55,8 +55,9 @@ COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 # The pyproject.toml already has the README.md reference removed
 # No need to modify it further
 
-# Install the package in development mode from the fixed pyproject.toml
-RUN cd /app/mixvllm && uv pip install --system -e .
+# Install the package in development mode for the current user
+# Don't use --system since it requires root privileges
+RUN cd /app/mixvllm && uv pip install -e .
 
 # Make the scripts executable
 RUN chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat
@@ -75,8 +76,9 @@ RUN which mixvllm-serve && \
     which mixvllm-chat && \
     echo "PATH: $PATH"
 
-# Make the entrypoint script executable
-RUN chmod +x /app/mixvllm/docker/entrypoint.sh
+# Verify and make the entrypoint script executable
+RUN ls -la /app/mixvllm/docker/entrypoint.sh && \
+    chmod +x /app/mixvllm/docker/entrypoint.sh
 
 ENTRYPOINT ["/app/mixvllm/docker/entrypoint.sh"]
 
