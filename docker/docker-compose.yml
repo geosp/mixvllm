@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mixvllm-server:
     build:
-      context: ..
+      context: ..  # This points to the root directory of your project
       dockerfile: Dockerfile
     
     container_name: mixvllm-server

@@ -29,17 +29,7 @@ if ! command -v mixvllm-serve &>/dev/null; then
   echo "PATH: $PATH"
   echo "Attempting to reinstall dependencies..."
   
-  # Check if we're in the repo directory already
-  if [ -f "/app/mixvllm/pyproject.toml" ]; then
-    cd /app/mixvllm
-  elif [ -f "/app/pyproject.toml" ]; then
-    cd /app
-  else
-    echo "Cloning repository..."
-    git clone https://github.com/geosp/mixvllm.git /tmp/mixvllm
-    cd /tmp/mixvllm
-  fi
-  
+  # We should already be in the correct directory
   echo "Installing from $(pwd)..."
   uv pip install --user -e .
   

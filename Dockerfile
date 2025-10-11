@@ -48,8 +48,9 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}:${HOME}/.local/bin
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
-# Clone the repository
-RUN git clone https://github.com/geosp/mixvllm.git /app/mixvllm
+# Copy the local repository contents into the container
+# We'll do this during the docker build with the context
+COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 
 # Install dependencies using uv from pyproject.toml
 # This automatically parses the file and installs everything specified
@@ -66,11 +67,10 @@ RUN which mixvllm-serve && \
     which mixvllm-chat && \
     echo "PATH: $PATH"
 
-# Entrypoint script to configure environment and run commands
-COPY --chown=mixvllm:mixvllm docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Make the entrypoint script executable
+RUN chmod +x /app/mixvllm/docker/entrypoint.sh
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/mixvllm/docker/entrypoint.sh"]
 
 # Default command keeps the container running and waiting for instructions
 # This allows you to execute commands via docker exec or specify a command in docker-compose
