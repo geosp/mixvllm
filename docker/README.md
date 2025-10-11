@@ -182,6 +182,19 @@ The compose file mounts two important volumes:
 | 8000 | Model API | OpenAI-compatible REST API |
 | 8888 | Web Terminal | Browser-based terminal with chat client |
 
+## Build Approach
+
+The Docker setup uses a hybrid approach:
+- **Pre-built base image**: Uses `ghcr.io/geosp/mixvllm:latest` from GitHub Container Registry
+- **Runtime git cloning**: Container clones the latest code from `https://github.com/geosp/mixvllm.git` when starting
+- **Automatic updates**: Always runs the latest version without rebuilding the base image
+
+### Key Features:
+- **Lightweight base images**: CUDA runtime and dependencies pre-installed
+- **Fresh code**: Clones latest repository code at container startup
+- **GPU acceleration**: Full CUDA support with NVIDIA Container Toolkit
+- **Flexible configuration**: Environment variables for model selection and GPU count
+
 ## Troubleshooting
 
 ### GPU Not Detected

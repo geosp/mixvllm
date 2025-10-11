@@ -41,9 +41,17 @@ services:
     #   GPU_COUNT=1               (default: 2)
     #   ENABLE_TERMINAL=""        (default: enabled)
     command: >
-      run bash ./mixvllm-serve
-      --model ${MODEL:-gpt-oss-20b}
-      --gpus ${GPU_COUNT}
-      ${ENABLE_TERMINAL:---enable-terminal}
+      bash -c "
+        echo 'Cloning mixvllm repository...' &&
+        git clone https://github.com/geosp/mixvllm.git /app/mixvllm-local &&
+        cd /app/mixvllm-local &&
+        echo 'Installing dependencies...' &&
+        uv pip install --system -e . &&
+        echo 'Starting mixvllm server...' &&
+        mixvllm-serve
+          --model ${MODEL:-gpt-oss-20b}
+          --gpus ${GPU_COUNT}
+          ${ENABLE_TERMINAL:---enable-terminal}
+      "
 
     restart: unless-stopped
