@@ -1,12 +1,14 @@
+version: '3.8'
+
 services:
   mixvllm-server:
-    # Use pre-built image from GitHub Container Registry
-    image: ghcr.io/geosp/mixvllm:latest
-
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    
     container_name: mixvllm-server
-
+    
     # GPU configuration
-    # Docker will make all GPUs available to the container
     deploy:
       resources:
         reservations:
@@ -14,41 +16,31 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
+    
     # Port mappings
     ports:
       - "8000:8000"   # Model server API
       - "8888:8888"   # Web terminal
-
+    
     # Environment variables
     environment:
       - HF_TOKEN=${HF_TOKEN}
       - NVIDIA_VISIBLE_DEVICES=all
-
+    
     # Volume for HuggingFace model cache
     volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-      
-    # Override the entrypoint since the image still has the uv entrypoint
-    entrypoint: ["/bin/bash", "-c"]
-
-    # Run a persistent command that keeps the container running
-    command: >
-      echo "==== Starting MixVLLM Container ====" &&
-      echo "Current directory: $(pwd)"
-      # echo "Cloning mixvllm repository..." &&
-      # rm -rf /app/mixvllm-local || true &&
-      # git clone https://github.com/geosp/mixvllm.git /app/mixvllm-local &&
-      # cd /app/mixvllm-local &&
-      # echo "Changed to directory: $(pwd)" &&
-      # echo "Installing dependencies with uv..." &&
-      # uv pip install --system -e . &&
-      # echo "Checking mixvllm-serve script..." &&
-      # which mixvllm-serve || echo "mixvllm-serve not found in PATH" &&
-      # ls -la $(which mixvllm-serve 2>/dev/null) || echo "Cannot access script file" &&
-      # echo "Checking executable permissions..." &&
-      # cat $(which mixvllm-serve 2>/dev/null) | head -n 10 || echo "Cannot read script file" &&
-      # echo "Starting mixvllm-serve with GPU parallelism..." &&
-      # mixvllm-serve --help || echo "Failed to run script"
-
+      - ~/.cache/huggingface:/home/mixvllm/.cache/huggingface
+    
+    # Command options:
+    # Option 1: Just keep the container running (default)
+    command: tail -f /dev/null
+    
+    # Option 2: Start mixvllm server automatically (uncomment to use)
+    # command: mixvllm-serve --model-config configs/gpt-oss-20b.yaml
+    
     restart: unless-stopped
+    
+    # Note: This configuration automatically:
+    # 1. Clones the repository into the container
+    # 2. Installs all dependencies from pyproject.toml
+    # 3. Runs mixvllm-serve with the specified config

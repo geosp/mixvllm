@@ -1,22 +1,16 @@
-# Universal CUDA + UV Base Image
+# Universal CUDA + UV Base Image with non-root user
 # Provides NVIDIA CUDA 12.8 runtime with Python 3.11 and UV package manager
-# Suitable for vLLM, MCP servers, and any GPU-accelerated Python applications
+# Automatically installs dependencies from pyproject.toml
 
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
 LABEL maintainer="Geovanny Fajardo <gffajardo@gmail.com>"
-LABEL description="Universal CUDA 12.8 + Python 3.11 + UV base image for GPU workloads"
+LABEL description="MixVLLM - vLLM inference server with auto-dependency installation"
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python 3.11 and system dependencies
-# - python3.11: Main Python interpreter
-# - python3.11-dev: Development headers for compiling Python extensions
-# - python3-pip: Package installer (used to install uv)
-# - git: Required for installing packages from git repositories
-# - curl: For downloading resources
-# - build-essential: GCC, G++, Make - required for compiling native extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-dev \
@@ -24,20 +18,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     build-essential \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # Make python3.11 the default python and python3
-# This ensures 'python' and 'python3' commands use Python 3.11
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 # Install uv (Universal Python package manager)
-# uv is a fast, modern Python package installer and runner
-# https://github.com/astral-sh/uv
 RUN pip install --no-cache-dir uv
 
+# Create a non-root user with sudo privileges
+RUN groupadd --gid 1000 mixvllm && \
+    useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash mixvllm && \
+    echo "mixvllm ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/mixvllm && \
+    chmod 0440 /etc/sudoers.d/mixvllm
+
+# Create app directories and set ownership
+RUN mkdir -p /app/mixvllm && chown -R mixvllm:mixvllm /app
+
 # Set working directory
-WORKDIR /app
+WORKDIR /app/mixvllm
+
+# Switch to non-root user
+USER mixvllm
+
+# Set environment variables for CUDA
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}:${HOME}/.local/bin
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Clone the repository
+RUN git clone https://github.com/geosp/mixvllm.git /app/mixvllm
+
+# Install dependencies using uv from pyproject.toml
+# This automatically parses the file and installs everything specified
+RUN uv pip install --user -e .
 
 # Expose common ports
 # 8000: Default vLLM/model server port
@@ -45,18 +61,17 @@ WORKDIR /app
 # 3000: Common MCP server port
 EXPOSE 8000 8888 3000
 
-# Set environment variables for CUDA
-# These help CUDA applications find the correct libraries
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+# Verify the installation and path
+RUN which mixvllm-serve && \
+    which mixvllm-chat && \
+    echo "PATH: $PATH"
 
-# Default entrypoint uses bash for more flexible command execution
-# UV is still available in the container for package management:
-#   docker run image uv pip install package
-#   docker run image uv run python script.py
-ENTRYPOINT ["/bin/bash", "-c"]
+# Entrypoint script to configure environment and run commands
+COPY --chown=mixvllm:mixvllm docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# Default command (can be overridden)
-# Just echoes a help message if no command is provided
-CMD ["echo 'MixVLLM Container: Specify a command to run. UV is available for package management.'"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Default command keeps the container running and waiting for instructions
+# This allows you to execute commands via docker exec or specify a command in docker-compose
+CMD ["tail", "-f", "/dev/null"]
