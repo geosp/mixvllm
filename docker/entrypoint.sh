@@ -13,15 +13,9 @@ fi
 echo "===== MIXVLLM CONTAINER ENTRYPOINT ====="
 echo "Running as user: $(id)"
 echo "Current directory: $(pwd)"
+echo "UV version: $(uv --version 2>&1)"
 echo "Python version: $(python --version 2>&1)"
-echo "Python executable: $(which python)"
-
-# Set up HuggingFace token if provided
-if [ -n "$HF_TOKEN" ]; then
-  echo "Setting up HuggingFace token..."
-  mkdir -p ~/.huggingface
-  echo -e "{\n  \"api_key\": \"$HF_TOKEN\"\n}" > ~/.huggingface/token
-fi
+echo "UV executable: $(which uv)"
 
 # Verify that the commands are available
 if [ ! -f "/app/mixvllm/serve" ] || [ ! -f "/app/mixvllm/chat" ]; then
