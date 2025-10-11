@@ -52,9 +52,17 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 # We'll do this during the docker build with the context
 COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 
-# Install dependencies using uv from pyproject.toml with --system flag
-# This automatically parses the file and installs everything specified
-RUN uv pip install --system -e .
+# The pyproject.toml already has the README.md reference removed
+# No need to modify it further
+
+# Install the package in development mode from the fixed pyproject.toml
+RUN cd /app/mixvllm && uv pip install --system -e .
+
+# Make the scripts executable
+RUN chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat
+
+# Add the scripts to the PATH
+ENV PATH=${PATH}:/app/mixvllm
 
 # Expose common ports
 # 8000: Default vLLM/model server port

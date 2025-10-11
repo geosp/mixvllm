@@ -7,53 +7,38 @@ set -e
 echo "===== MIXVLLM CONTAINER ENTRYPOINT ====="
 echo "Running as user: $(id)"
 echo "Current directory: $(pwd)"
-echo "PATH: $PATH"
-
-# Display Python and UV versions
 echo "Python version: $(python --version 2>&1)"
-echo "UV version: $(uv --version 2>&1)"
 
-# Check for HuggingFace token
+# Set up HuggingFace token if provided
 if [ -n "$HF_TOKEN" ]; then
-  echo "HuggingFace token detected. Configuring credentials..."
+  echo "Setting up HuggingFace token..."
   mkdir -p ~/.huggingface
   echo -e "{\n  \"api_key\": \"$HF_TOKEN\"\n}" > ~/.huggingface/token
-else
-  echo "Warning: HF_TOKEN environment variable not set. Private models may not be accessible."
 fi
 
-# Environment check
-echo "Checking environment and dependencies..."
+# Verify that the commands are available
 if ! command -v mixvllm-serve &>/dev/null; then
-  echo "ERROR: mixvllm-serve not found in PATH. Installation may have failed."
+  echo "WARNING: mixvllm-serve not found in PATH. Installation may have failed."
   echo "PATH: $PATH"
-  echo "Attempting to reinstall dependencies..."
+  echo "Checking installed packages:"
+  python -m pip list
   
-  # We should already be in the correct directory
-  echo "Installing from $(pwd)..."
-  uv pip install --system -e .
-  
-  if ! command -v mixvllm-serve &>/dev/null; then
-    echo "ERROR: Installation failed. Please check logs."
-    exit 1
-  fi
+  echo "Adding scripts directory to PATH as a fallback..."
+  export PATH=$PATH:/app/mixvllm
+  chmod +x /app/mixvllm/mixvllm-serve /app/mixvllm/mixvllm-chat
 fi
 
-echo "MixVLLM environment is ready!"
-
-# Check for command line arguments
-if [ "$#" -eq 0 ]; then
-  # Default behavior: just wait
-  echo "Container is running and waiting for commands."
-  echo "Use 'docker exec -it mixvllm-server mixvllm-serve' to start the server."
-  echo "Or specify a command in docker-compose.yml."
-elif [ "$1" = "tail" ] && [ "$2" = "-f" ] && [ "$3" = "/dev/null" ]; then
-  # Default CMD from Dockerfile - just keep container running
+# Simple argument handling
+if [ "$#" -eq 0 ] || [ "$1" = "tail" ] && [ "$2" = "-f" ] && [ "$3" = "/dev/null" ]; then
+  # Default behavior: keep container running
   echo "Container is running in idle mode."
-  echo "Use 'docker exec -it mixvllm-server mixvllm-serve' to start the server."
-  exec "$@"
+  echo "Use 'docker exec -it mixvllm-server /app/mixvllm/mixvllm-serve' to start the server."
+  echo "Or specify a command in docker-compose.yml."
+  
+  # Keep container running
+  exec tail -f /dev/null
 else
-  # Run the provided command
+  # Run whatever command was provided
   echo "Running command: $@"
   exec "$@"
 fi
