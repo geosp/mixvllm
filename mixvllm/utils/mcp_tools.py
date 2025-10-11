@@ -107,7 +107,10 @@ def get_available_mcp_tools(config_path: Optional[str] = None) -> List[Any]:
                         field_type = int
                     elif prop_type == 'boolean':
                         field_type = bool
+                    elif prop_type == 'string':
+                        field_type = str
                     else:
+                        # Default to string for unknown types
                         field_type = str
 
                     # Make it Optional if not required
@@ -115,14 +118,19 @@ def get_available_mcp_tools(config_path: Optional[str] = None) -> List[Any]:
                         from typing import Optional
                         field_type = Optional[field_type]
 
-                    fields[prop_name] = Field(
+                    # Store the type annotation
+                    fields[prop_name] = (field_type, Field(
                         description=prop_info.get('description', ''),
                         default=... if prop_name in required_fields else None
-                    )
+                    ))
 
                 # Create the args schema class
+                annotations = {name: field_type for name, (field_type, _) in fields.items()}
+                model_fields = {name: field_obj for name, (_, field_obj) in fields.items()}
+                
                 ArgsSchema = type(f"{tool_name}Args", (BaseModel,), {
-                    "__annotations__": fields,
+                    "__annotations__": annotations,
+                    **model_fields,
                     "model_config": {"arbitrary_types_allowed": True}
                 })
             else:
