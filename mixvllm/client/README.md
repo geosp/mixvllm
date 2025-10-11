@@ -2,6 +2,148 @@
 
 This document provides detailed technical information about the chat client's MCP (Model Context Protocol) implementation, internal architecture, and data flows.
 
+## Learning Guide: Understanding the Chat Client
+
+This client demonstrates several important concepts in building LLM chat applications:
+
+### Key Learning Areas
+
+**1. LLM Client Architecture**
+- **Modular design**: Separation of concerns (networking, UI, logic)
+- **Configuration management**: Centralized settings with dataclasses
+- **Error handling**: Graceful degradation and user-friendly messages
+
+**2. OpenAI API Compatibility**
+- **Why vLLM uses OpenAI's API**: Industry standard, wide ecosystem support
+- **Benefits**: Drop-in replacement for OpenAI, use existing SDKs
+- **Endpoints**: `/v1/chat/completions`, `/v1/models`, `/health`
+
+**3. HTTP Communication Patterns**
+- **Connection pooling**: Reusing TCP connections for performance
+- **Streaming vs non-streaming**: Trade-offs in latency and UX
+- **Error handling**: Network errors, timeouts, malformed responses
+
+**4. Model Context Protocol (MCP)**
+- **Tool calling**: Enabling LLMs to interact with external systems
+- **Two-phase prompting**: Tool selection → Tool execution → Result formatting
+- **JSON-based communication**: Structured data exchange with LLM
+
+**5. Conversation Management**
+- **Context window**: Managing conversation history within token limits
+- **Message roles**: System, user, assistant for proper prompting
+- **History tracking**: Maintaining conversational context
+
+### Core Design Patterns
+
+**Factory Pattern** (`config.py`)
+- `ChatConfig.from_args()` creates config from different sources
+- Enables flexible construction without changing the class
+
+**Manager Pattern** (all `*_manager.py` files)
+- Encapsulates related functionality (tools, history, UI, connections)
+- Single responsibility principle: each manager has one job
+
+**Strategy Pattern** (`chat_engine.py`)
+- `_chat_direct()` vs `_chat_with_mcp_tools()` - different chat strategies
+- Switches between strategies based on configuration
+
+**Dependency Injection**
+- Components receive dependencies via constructor
+- Enables testing and modularity
+
+### HTTP Connection Pooling
+
+**Why it matters:**
+```python
+# Without pooling (slow):
+for i in range(10):
+    requests.get(url)  # New TCP connection each time: 10 x 50ms = 500ms
+
+# With pooling (fast):
+session = requests.Session()
+for i in range(10):
+    session.get(url)  # Reuse connection: 50ms + 9 x 5ms = 95ms
+```
+
+**Implementation:**
+- `ConnectionManager` uses `requests.Session()`
+- Session maintains connection pool automatically
+- 5-10x faster for multiple requests
+
+### Streaming Responses
+
+**How streaming works:**
+```
+Client ──────────────────────────► vLLM Server
+       ← token ← token ← token ← token ←
+
+Display updates as each token arrives (real-time)
+```
+
+**Without streaming:**
+```
+Client ──────────────────────────► vLLM Server
+       ← [wait 10 seconds] ← full response ←
+
+User waits for entire response before seeing anything
+```
+
+**Trade-offs:**
+- Streaming: Better perceived latency, more complex code
+- Non-streaming: Simpler code, worse user experience for long responses
+
+### MCP Tool Calling Flow
+
+**Phase 1: Tool Selection**
+```
+User: "What's the weather in San Francisco?"
+   ↓
+LLM receives:
+- System prompt describing available tools
+- Tool: weather_get(city: str) -> str
+- User query
+   ↓
+LLM responds: {"tool": "weather_get", "parameters": {"city": "San Francisco"}}
+```
+
+**Phase 2: Tool Execution**
+```
+Parse JSON → Extract tool_name and params
+   ↓
+Execute: weather_get(city="San Francisco")
+   ↓
+Result: "72°F, sunny, 10 mph winds"
+```
+
+**Phase 3: Result Formatting**
+```
+Send to LLM:
+- Tool name: weather_get
+- Parameters: {"city": "San Francisco"}
+- Raw result: "72°F, sunny, 10 mph winds"
+   ↓
+LLM formats nicely:
+"The weather in San Francisco is currently 72°F and sunny,
+with light winds at 10 mph. Great day for outdoor activities!"
+```
+
+### OpenAI Client vs HTTP Requests
+
+**This client supports both methods:**
+
+| Aspect | OpenAI Client | HTTP Requests |
+|--------|--------------|---------------|
+| Ease of use | ✅ High-level, intuitive | ⚠️ Manual JSON handling |
+| Streaming | ✅ Built-in support | ⚠️ Manual SSE parsing |
+| Error handling | ✅ Typed exceptions | ⚠️ Generic HTTP errors |
+| Dependencies | ⚠️ Requires openai package | ✅ Only requests needed |
+| Compatibility | ✅ Works with any OpenAI-compatible API | ✅ Universal |
+
+**Why support both:**
+- OpenAI client: Better DX when available
+- HTTP fallback: Works in constrained environments
+- Demonstrates both approaches for learning
+
 ## Architecture Overview
 
 The chat client implements a modular architecture with clear separation of concerns, enabling robust MCP tool integration with vLLM servers.
