@@ -75,6 +75,9 @@ def merge_configs(base_config: ServeConfig, cli_args: Dict[str, Any]) -> ServeCo
         'quantization': 'inference.quantization',
         'host': 'server.host',
         'port': 'server.port',
+        'enable_terminal': 'terminal.enabled',
+        'terminal_host': 'terminal.host',
+        'terminal_port': 'terminal.port',
         'temperature': 'generation_defaults.temperature',
         'max_tokens': 'generation_defaults.max_tokens',
         'top_p': 'generation_defaults.top_p',
@@ -95,6 +98,12 @@ def merge_configs(base_config: ServeConfig, cli_args: Dict[str, Any]) -> ServeCo
             for key in keys[:-1]:
                 current = current.setdefault(key, {})
             current[keys[-1]] = value
+
+    # Handle special case: --no-terminal-auto-chat flag
+    if cli_args.get('no_terminal_auto_chat'):
+        if 'terminal' not in config_dict:
+            config_dict['terminal'] = {}
+        config_dict['terminal']['auto_start_chat'] = False
 
     # Create new config
     return ServeConfig(**config_dict)

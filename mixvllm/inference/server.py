@@ -7,6 +7,8 @@ prepare server arguments, and start the vLLM OpenAI-compatible server.
 import argparse
 import subprocess
 import sys
+import threading
+from pathlib import Path
 from typing import List
 
 from .config import ServeConfig
@@ -73,6 +75,35 @@ def prepare_server_args(config: ServeConfig) -> List[str]:
     return args
 
 
+def start_terminal_server_thread(config: ServeConfig, project_root: str) -> threading.Thread:
+    """Start the terminal server in a separate thread.
+
+    Args:
+        config: Server configuration
+        project_root: Root directory of the project
+
+    Returns:
+        Thread running the terminal server
+    """
+    from .terminal_server import start_terminal_server
+
+    # Build model server URL
+    model_server_url = f"http://localhost:{config.server.port}"
+
+    # Create thread
+    terminal_thread = threading.Thread(
+        target=start_terminal_server,
+        args=(config.terminal, model_server_url, project_root),
+        daemon=True,  # Daemon thread will exit when main thread exits
+        name="TerminalServer"
+    )
+
+    # Start thread
+    terminal_thread.start()
+
+    return terminal_thread
+
+
 def start_server(config: ServeConfig) -> None:
     """Start the vLLM server with the given configuration.
 
@@ -96,6 +127,27 @@ def start_server(config: ServeConfig) -> None:
     print(f"  GPU Memory: {config.inference.gpu_memory_utilization}")
     print(f"  Max Length: {config.inference.max_model_len}")
     print(f"  Host: {config.server.host}:{config.server.port}")
+
+    # Start terminal server if enabled
+    terminal_thread = None
+    if config.terminal.enabled:
+        try:
+            # Get project root (directory containing mixvllm-chat script)
+            project_root = str(Path(__file__).parent.parent.parent)
+
+            print(f"\n🖥️  Terminal server enabled:")
+            print(f"  Host: {config.terminal.host}:{config.terminal.port}")
+            print(f"  Auto-start chat: {config.terminal.auto_start_chat}")
+
+            terminal_thread = start_terminal_server_thread(config, project_root)
+
+            # Give terminal server a moment to start
+            import time
+            time.sleep(1)
+
+        except Exception as e:
+            print(f"\n⚠️  Warning: Failed to start terminal server: {e}")
+            print("    Continuing with model server only...")
 
     # Build command
     cmd = [sys.executable, '-m', 'vllm.entrypoints.openai.api_server'] + args_list

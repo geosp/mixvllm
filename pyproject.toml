@@ -19,6 +19,8 @@ dependencies = [
     "langgraph>=0.1.0",
     "openai>=2.2.0",
     "pylatexenc>=2.10",
+    "terminado>=0.18.0",
+    "tornado>=6.4.0",
 ]
 
 [project.optional-dependencies]

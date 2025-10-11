@@ -641,9 +641,65 @@ lsof -ti:8000 | xargs kill -9
 - Use `--host 0.0.0.0` only with proper firewall rules
 - Validate all models before deployment
 
+## Web Terminal Feature
+
+The server can optionally provide a web-based terminal interface, allowing browser access to CLI tools like `mixvllm-chat` without SSH.
+
+### Web Terminal Options
+
+```bash
+# Enable web terminal (runs on port 8888 by default)
+--enable-terminal               # Enable web terminal
+-t                             # Shorthand for --enable-terminal
+
+# Configuration
+--terminal-port 9000           # Custom port (default: 8888)
+--terminal-host 0.0.0.0        # Host interface (default: 0.0.0.0)
+--no-terminal-auto-chat        # Don't auto-start chat client
+```
+
+### Quick Start with Terminal
+
+```bash
+# Start server with web terminal
+uv run python mixvllm/cli/serve_model.py \
+  --model microsoft/Phi-3-mini-4k-instruct \
+  --trust-remote-code \
+  --enable-terminal
+
+# Or using convenience script
+./mixvllm-serve --model phi3-mini -t
+
+# Then open browser to: http://localhost:8888
+```
+
+### YAML Configuration
+
+```yaml
+terminal:
+  enabled: true              # Enable web terminal
+  host: "0.0.0.0"           # Listen on all interfaces
+  port: 8888                 # Terminal server port
+  auto_start_chat: true      # Auto-run mixvllm-chat on connect
+```
+
+### Security Considerations
+
+⚠️ **Important**: The web terminal provides full shell access
+- Recommended for development/internal use only
+- No authentication by default
+- Only enable in trusted environments
+- Consider SSH port forwarding for remote access:
+  ```bash
+  ssh -L 8888:localhost:8888 user@server
+  ```
+
+See the main [README.md](../../README.md#web-terminal) for detailed documentation.
+
 ## Examples
 
 See the `configs/` directory for example configuration files:
 - `phi3-mini.yaml` - Phi-3 mini model configuration
+- `phi3-mini-with-terminal.yaml` - Phi-3 with web terminal enabled
 - `llama-70b-tp2.yaml` - LLaMA 70B with tensor parallelism
 - `gpt-oss-20b.yaml` - GPT OSS model configuration

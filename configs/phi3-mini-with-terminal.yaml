@@ -1,0 +1,25 @@
+# Configuration for Phi-3 Mini model with web terminal enabled
+# Lightweight model, fits on single GPU
+# Includes web terminal for browser-based CLI access
+
+model:
+  name: "microsoft/Phi-3-mini-4k-instruct"
+
+inference:
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.8
+  max_model_len: 4096
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+terminal:
+  enabled: true           # Enable web terminal
+  host: "0.0.0.0"        # Listen on all interfaces
+  port: 8888              # Terminal server port
+  auto_start_chat: true   # Auto-run mixvllm-chat on connect
+
+generation_defaults:
+  temperature: 0.7
+  max_tokens: 512

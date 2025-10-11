@@ -1,6 +1,86 @@
-# Chat Client - Developer Documentation
+# Chat Client
 
-This document provides detailed technical information about the chat client's MCP (Model Context Protocol) implementation, internal architecture, and data flows.
+Interactive CLI chat application for vLLM servers with optional MCP (Model Context Protocol) tool integration.
+
+## Quick Start
+
+### Basic Usage
+
+```bash
+# Start a model server first (in another terminal)
+./mixvllm-serve --model phi3-mini
+
+# Connect and start chatting
+uv run mixvllm-chat
+```
+
+### With Web Terminal (Easiest)
+
+```bash
+# Start server with built-in web terminal
+./mixvllm-serve --model phi3-mini --terminal
+
+# Open browser to http://localhost:8888
+# Chat interface launches automatically!
+```
+
+### Command-Line Options
+
+```bash
+# Connect to specific server (auto-detects model)
+uv run mixvllm-chat --base-url http://localhost:8000
+
+# Enable streaming responses
+uv run mixvllm-chat --stream --temperature 0.8
+
+# Enable MCP tools for enhanced capabilities
+uv run mixvllm-chat --enable-mcp --mcp-config configs/mcp_servers.yaml
+```
+
+### Available Commands
+
+While chatting, use these commands:
+- `/help` - Show available commands
+- `/clear` - Clear conversation history
+- `/history` - Display conversation history
+- `/mcp` - Show MCP tool status (when MCP enabled)
+- `/quit` - Exit the chat
+
+## Features
+
+- **Rich Terminal UI**: Beautiful formatting with colors, panels, and markdown
+- **Conversation Context**: Maintains chat history for coherent conversations
+- **Streaming Support**: Real-time response streaming with live updates
+- **Model Auto-detection**: Automatically detects available models from server
+- **MCP Tool Integration**: Enable tools like weather queries, file operations, etc.
+- **Enhanced Input**: History-based auto-completion and navigation
+
+## MCP Tools (Optional)
+
+Enable advanced capabilities by connecting to MCP (Model Context Protocol) servers:
+
+```bash
+# Weather queries
+uv run mixvllm-chat --enable-mcp
+
+# With custom MCP configuration
+uv run mixvllm-chat --enable-mcp --mcp-config configs/mcp_servers.yaml
+```
+
+Example MCP conversation:
+```
+You: What's the weather like in New York?
+Assistant: [Uses weather tool] Current weather in New York: 22°C with
+          partly cloudy conditions and light winds at 5 km/h.
+```
+
+---
+
+## Developer Documentation
+
+This section provides detailed technical information about the chat client's MCP implementation, internal architecture, and data flows.
+
+> **💡 Web Access**: The chat client can be accessed via web browser using the web terminal feature. Start the server with `./mixvllm-serve --model phi3-mini --terminal` and open `http://localhost:8888`. See the main [README.md](../../README.md#web-terminal) for details.
 
 ## Learning Guide: Understanding the Chat Client
 

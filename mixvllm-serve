@@ -23,13 +23,44 @@ while (( $# )); do
     -m|--model) shift; MODEL="$1"; shift ;;
     -h|--help)
       cat <<'EOF'
-Usage: mixvllm-serve --model <name> [-- uv‑options...]
+Usage: mixvllm-serve --model <name> [OPTIONS...]
 
 Options:
-  -m, --model   Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
-  -h, --help    Show this help message
+  -m, --model              Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
+  -h, --help               Show this help message
+  -t, --terminal           Enable web terminal (shorthand for --enable-terminal)
+  --enable-terminal        Enable web terminal for browser-based CLI access
+  --terminal-port PORT     Web terminal server port (default: 8888)
+  --terminal-host HOST     Web terminal server host (default: 0.0.0.0)
+  --no-terminal-auto-chat  Disable auto-starting chat in web terminal
+
+Any other options are passed through to the underlying mixvllm-serve command.
+
+Examples:
+  # Serve model with web terminal enabled
+  ./mixvllm-serve --model phi3-mini --terminal
+
+  # Custom terminal port
+  ./mixvllm-serve --model phi3-mini --terminal --terminal-port 9000
+
+  # Terminal without auto-starting chat
+  ./mixvllm-serve --model phi3-mini --terminal --no-terminal-auto-chat
 EOF
       exit 0
+      ;;
+    -t|--terminal)
+      ARGV+=("--enable-terminal")
+      shift
+      ;;
+    --enable-terminal|--terminal-port|--terminal-host|--no-terminal-auto-chat)
+      # Terminal-related flags: pass through as-is
+      if [[ "$1" == "--terminal-port" || "$1" == "--terminal-host" ]]; then
+        ARGV+=("$1" "$2")
+        shift 2
+      else
+        ARGV+=("$1")
+        shift
+      fi
       ;;
     --) shift; ARGV+=("$@"); break ;;
     *) ARGV+=("$1"); shift ;;

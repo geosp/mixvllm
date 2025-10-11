@@ -10,7 +10,10 @@ The `mixvllm/inference` package provides a comprehensive wrapper around vLLM for
 mixvllm/inference/
 ├── config.py          # Pydantic configuration models
 ├── server.py          # vLLM server wrapper & lifecycle
-└── utils.py           # Configuration utilities & GPU detection
+├── utils.py           # Configuration utilities & GPU detection
+├── terminal_server.py # Web terminal server (optional)
+└── static/
+    └── terminal.html  # xterm.js frontend for web terminal
 ```
 
 ## Core Components
@@ -46,6 +49,12 @@ class ServeConfig(BaseModel):
 - `host`: Server bind address
 - `port`: Server port
 - `workers`: Number of worker processes
+
+**TerminalConfig**: Web terminal settings (optional)
+- `enabled`: Enable web terminal interface
+- `host`: Terminal server bind address
+- `port`: Terminal server port (default: 8888)
+- `auto_start_chat`: Auto-launch mixvllm-chat on connection
 
 **GenerationDefaultsConfig**: Default generation parameters
 - `temperature`: Sampling temperature
@@ -253,6 +262,164 @@ server_process = start_server(merged_config)
 - `pyyaml`: YAML configuration file parsing
 - `torch`: GPU detection and information gathering
 - `vllm`: Model serving backend (runtime dependency)
+- `terminado`: PTY management for web terminal (optional)
+- `tornado`: Async web server for terminal WebSockets (optional)
+
+## Web Terminal Feature (`terminal_server.py`)
+
+### Overview
+
+The web terminal provides browser-based access to CLI tools via xterm.js and WebSocket connections. It runs independently on a separate port and thread from the main model server.
+
+### Architecture
+
+```mermaid
+graph TD
+    A[Main Server Thread] --> B[vLLM Server :8000]
+    A --> C[Terminal Server Thread :8888]
+    C --> D[Tornado Web Server]
+    D --> E[HTTP Handler /]
+    D --> F[WebSocket Handler /terminal]
+    E --> G[terminal.html + xterm.js]
+    F --> H[terminado PTY Manager]
+    H --> I[Bash Shell in Project Root]
+    I --> J[Auto-start mixvllm-chat]
+```
+
+### Key Components
+
+**TerminalPageHandler**: Serves the HTML page with xterm.js frontend
+```python
+class TerminalPageHandler(tornado.web.RequestHandler):
+    def get(self):
+        # Load and serve terminal.html with configuration variables
+        # Replaces {{MODEL_SERVER_URL}} and {{AUTO_START_CHAT}}
+```
+
+**Tornado Application**: Routes and WebSocket management
+```python
+def create_terminal_app(config, model_server_url, project_root):
+    # Create terminado manager with bash shell
+    # Configure routes for HTTP and WebSocket
+    # Return configured Tornado application
+```
+
+**Terminal Server Lifecycle**: Runs in separate thread
+```python
+def start_terminal_server(config, model_server_url, project_root):
+    # Create Tornado application
+    # Start listening on terminal port
+    # Run event loop (blocking in thread)
+```
+
+### Integration with Main Server
+
+The terminal server is optionally started alongside the vLLM server:
+
+```python
+# In server.py
+if config.terminal.enabled:
+    terminal_thread = start_terminal_server_thread(config, project_root)
+```
+
+### Terminal Manager
+
+Uses terminado's `UniqueTermManager` with custom working directory:
+
+```python
+class CustomTermManager(UniqueTermManager):
+    def new_terminal(self, **kwargs):
+        kwargs['cwd'] = project_root  # Start in project root
+        return super().new_terminal(**kwargs)
+```
+
+### Frontend (terminal.html)
+
+- **xterm.js**: Professional terminal emulator loaded via CDN
+- **WebSocket Connection**: Bidirectional communication with PTY
+- **Auto-start**: Optionally sends command to start mixvllm-chat
+- **Responsive Design**: Terminal fills viewport with proper sizing
+
+### Security Model
+
+⚠️ **No Authentication**: The terminal provides full shell access without authentication
+
+**Current State**:
+- Open access to anyone who can reach the port
+- Same permissions as server process
+- Suitable for trusted/development environments only
+
+**Recommendations**:
+- Use behind VPN or firewall
+- Enable only when needed
+- Consider SSH port forwarding for remote access
+- Future: Add authentication middleware
+
+### Configuration Flow
+
+```yaml
+# YAML config
+terminal:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8888
+  auto_start_chat: true
+```
+
+↓
+
+```python
+# Pydantic validation
+class TerminalConfig(BaseModel):
+    enabled: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8888
+    auto_start_chat: bool = True
+```
+
+↓
+
+```python
+# CLI override
+--enable-terminal --terminal-port 9000
+```
+
+### Error Handling
+
+**Connection Failures**:
+- PTY spawn failures logged to console
+- WebSocket errors sent to browser console
+- Connection closed message displayed to user
+
+**Port Conflicts**:
+- Tornado will raise exception if port unavailable
+- Server continues without terminal (non-fatal)
+
+### Performance Characteristics
+
+- **Minimal Overhead**: Terminal runs in separate thread
+- **No Impact on Model Serving**: Independent from vLLM process
+- **WebSocket Efficiency**: Binary PTY data over persistent connection
+- **Multiple Terminals**: Supports up to 10 concurrent terminal sessions
+
+### Development Notes
+
+**Dependencies**:
+- terminado ≥0.18.0 for PTY management
+- tornado ≥6.4.0 for async web + WebSocket
+- xterm.js 5.3.0+ loaded from CDN (no build step)
+
+**Testing Considerations**:
+- Mock terminado for unit tests
+- Test WebSocket lifecycle (connect, data, close)
+- Verify PTY working directory configuration
+- Test concurrent terminal sessions
+
+**Known Limitations**:
+- No session persistence (terminals lost on server restart)
+- No authentication/authorization
+- No recording/playback of terminal sessions
+- Shell command is bash-only (not configurable per-user)
 
 ## Future Enhancements
 

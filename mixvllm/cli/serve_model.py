@@ -333,6 +333,50 @@ def main() -> None:
     # Use case: Preventing word/phrase repetition in longer text
     # Example: --frequency-penalty 0.3
 
+    # ------------------------------------------------------------------------
+    # Web Terminal Options
+    # ------------------------------------------------------------------------
+    parser.add_argument(
+        '--enable-terminal',
+        action='store_true',  # Boolean flag: True if present, False if absent
+        help='Enable web terminal for browser-based CLI access'
+    )
+    # What it does: Starts a web server providing terminal access via browser
+    # Use case: Remote access to CLI tools without SSH
+    # Security: Only enable in trusted environments
+    # Example: --enable-terminal
+
+    parser.add_argument(
+        '--terminal-port',
+        type=int,  # Expects an integer port number
+        default=8888,  # Default terminal port
+        help='Web terminal server port number'
+    )
+    # What it does: Sets the port for the web terminal server
+    # Default: 8888 (separate from model server port)
+    # Valid range: 1024-65535
+    # Example: --terminal-port 9000
+
+    parser.add_argument(
+        '--terminal-host',
+        type=str,  # Expects an IP address string
+        default='0.0.0.0',  # Default: listen on all interfaces
+        help='Web terminal server host address'
+    )
+    # What it does: Sets the network interface for the terminal server
+    # Options same as --host (0.0.0.0, 127.0.0.1, specific IP)
+    # Example: --terminal-host 127.0.0.1 (local only)
+
+    parser.add_argument(
+        '--no-terminal-auto-chat',
+        action='store_true',  # Boolean flag
+        help='Disable auto-starting chat in web terminal'
+    )
+    # What it does: Prevents automatic execution of mixvllm-chat
+    # Default behavior: Auto-starts chat for convenience
+    # Use this flag: If you want just a plain shell
+    # Example: --no-terminal-auto-chat
+
     # ========================================================================
     # STEP 3: Parse Arguments
     # ========================================================================
