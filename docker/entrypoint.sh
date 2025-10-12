@@ -4,9 +4,9 @@
 set -e
 
 # Activate virtual environment if it exists
-if [ -f "/home/mixvllm/.venv/bin/activate" ]; then
+if [ -f "/app/mixvllm/.venv/bin/activate" ]; then
   echo "Activating virtual environment..."
-  . /home/mixvllm/.venv/bin/activate
+  . /app/mixvllm/.venv/bin/activate
 fi
 
 # Print welcome message
@@ -18,7 +18,7 @@ echo "Python version: $(python --version 2>&1)"
 echo "UV executable: $(which uv)"
 
 # Verify that the commands are available
-if [ ! -f "/app/mixvllm/serve" ] || [ ! -f "/app/mixvllm/chat" ]; then
+if [ ! -f "/app/mixvllm/launch" ] || [ ! -f "/app/mixvllm/chat" ]; then
   echo "ERROR: Convenience scripts not found. Installation may have failed."
   echo "PATH: $PATH"
   echo "Checking for scripts:"
@@ -32,7 +32,7 @@ fi
 if [ "$#" -eq 0 ] || [ "$1" = "tail" ] && [ "$2" = "-f" ] && [ "$3" = "/dev/null" ]; then
   # Default behavior: keep container running
   echo "Container is running in idle mode."
-  echo "Use 'docker exec -it mixvllm-server /app/mixvllm/serve --model <model-name>' to start the server."
+  echo "Use 'docker exec -it mixvllm-server /app/mixvllm/launch --model <model-name>' to start the server."
   echo "Or specify a command in docker-compose.yml."
   
   # Keep container running

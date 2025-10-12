@@ -45,9 +45,9 @@ USER mixvllm
 
 # Set environment variables for CUDA and virtual environment
 ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}:/home/mixvllm/.venv/bin:/home/mixvllm/.local/bin
+ENV PATH=${CUDA_HOME}/bin:${PATH}:/app/mixvllm/.venv/bin:/home/mixvllm/.local/bin
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-ENV VIRTUAL_ENV=/home/mixvllm/.venv
+ENV VIRTUAL_ENV=/app/mixvllm/.venv
 
 # Copy the local repository contents into the container
 # We'll do this during the docker build with the context
@@ -56,16 +56,15 @@ COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 # The pyproject.toml already has the README.md reference removed
 # No need to modify it further
 
-# Create a virtual environment for the mixvllm user
-RUN uv venv /home/mixvllm/.venv
+# Create a virtual environment in the project directory
+RUN cd /app/mixvllm && uv venv
 
 # Activate the virtual environment and install the package in development mode
-RUN . /home/mixvllm/.venv/bin/activate && \
-    cd /app/mixvllm && \
+RUN cd /app/mixvllm && . .venv/bin/activate && \
     uv pip install -e .
 
 # Make the convenience scripts executable
-RUN chmod +x /app/mixvllm/serve /app/mixvllm/chat
+RUN chmod +x /app/mixvllm/launch /app/mixvllm/chat
 
 # Add the scripts to the PATH
 ENV PATH=${PATH}:/app/mixvllm
@@ -77,7 +76,7 @@ ENV PATH=${PATH}:/app/mixvllm
 EXPOSE 8000 8888 3000
 
 # Verify the installation and path
-RUN ls -la /app/mixvllm/serve && \
+RUN ls -la /app/mixvllm/launch && \
     ls -la /app/mixvllm/chat && \
     echo "PATH: $PATH"
 

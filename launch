@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------
-# serve – wrapper that pulls the right YAML from the configs/ #
+# launch – wrapper that pulls the right YAML from the configs/ #
 # directory and forwards everything to the mixvllm-serve cmd  #
 # ------------------------------------------------------------
 set -euo pipefail
@@ -23,7 +23,7 @@ while (( $# )); do
     -m|--model) shift; MODEL="$1"; shift ;;
     -h|--help)
       cat <<'EOF'
-Usage: serve --model <n> [OPTIONS...]
+Usage: launch --model <n> [OPTIONS...]
 
 Options:
   -m, --model              Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
@@ -38,13 +38,13 @@ Any other options are passed through to the underlying mixvllm-serve command.
 
 Examples:
   # Serve model with web terminal enabled
-  ./serve --model phi3-mini --terminal
+  ./launch --model phi3-mini --terminal
 
   # Custom terminal port
-  ./serve --model phi3-mini --terminal --terminal-port 9000
+  ./launch --model phi3-mini --terminal --terminal-port 9000
 
   # Terminal without auto-starting chat
-  ./serve --model phi3-mini --terminal --no-terminal-auto-chat
+  ./launch --model phi3-mini --terminal --no-terminal-auto-chat
 EOF
       exit 0
       ;;
