@@ -52,15 +52,7 @@ RUN cd /app/mixvllm && uv venv
 # Install only the terminal server dependencies
 # We don't need vLLM, CUDA, or GPU dependencies
 RUN cd /app/mixvllm && . .venv/bin/activate && \
-    uv pip install \
-        tornado \
-        terminado \
-        prompt_toolkit \
-        rich \
-        pydantic \
-        openai \
-        requests \
-        && \
+    uv pip install -e pyproject-terminal.toml && \
     uv pip install -e . --no-deps
 
 # Create separate venvs for standalone components
