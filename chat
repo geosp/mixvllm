@@ -79,4 +79,5 @@ fi
 # ----------------------------------------------------------------- #
 cd "$SCRIPT_DIR"
 echo "🚀 Launching MixVLLM Chat via uv"
-uv run python "$APP_ENTRY" "${ARGS[@]}"
+PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+    uv run python "$APP_ENTRY" "${ARGS[@]}"
