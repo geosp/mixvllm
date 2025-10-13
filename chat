@@ -1,38 +1,31 @@
 #!/usr/bin/env bash
 #
-# chat – tiny wrapper that
-#   * gives a default base‑URL
-#   * never enables MCP unless the user requests it
-#   * if MCP is enabled, the corresponding config file is automatically added
+# chat – launcher for the MixVLLM standalone chat client
+# Always uses uv for environment management.
 #
-# The wrapper is intentionally minimal: it just parses the arguments you
-# care about, injects any missing defaults, then hands everything over to
-# `uv run mixvllm‑chat`.
+# Features:
+#   * Default base-URL: http://localhost:8000
+#   * Optional MCP integration via --enable-mcp
+#   * Runs via `uv run` (no manual venv activation required)
 #
 # Usage:
 #   ./chat [--base-url URL] [--enable-mcp] [--mcp-config FILE] [Other args…]
 #
-#   - If you don't mention --enable‑mcp, the chat server will run **without**
-#     MCP and the config file will never be added.
-#   - When you do pass --enable‑mcp (or -m), the wrapper will append
-#     `--mcp-config configs/mcp_servers.yaml` automatically.
-#   - The default base‑URL is http://localhost:8000, but you can override it
-#     with --base‑url YOUR_URL
-#
 set -euo pipefail
 
 # ----------------------------------------------------------------- #
-# 1. Default values and helpers                                    #
+# 1. Defaults & setup                                               #
 # ----------------------------------------------------------------- #
 DEFAULT_BASE_URL="http://localhost:8000"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MCP_CONFIG_FILE="$SCRIPT_DIR/configs/mcp_servers.yaml"
+APP_ENTRY="standalone/chat/chat_client_standalone.py"
 
 # ----------------------------------------------------------------- #
-# 2. Parse user arguments                                          #
+# 2. Parse user arguments                                           #
 # ----------------------------------------------------------------- #
 ARGS=()
-enable_mcp_provided=false   # remember if the user explicitly asked
+enable_mcp_provided=false
 
 while (( $# )); do
     case "$1" in
@@ -40,32 +33,28 @@ while (( $# )); do
             cat <<'EOF'
 Usage: chat [--base-url URL] [--enable-mcp] [--mcp-config FILE] [Other args…]
 
-Options
-  --base-url URL        Override the default server URL
+Options:
+  --base-url URL        Override the default model server URL
   -m | --enable-mcp     Enable MCP mode (adds --mcp-config automatically)
   --mcp-config FILE     Path to the MCP config file (only used if --enable-mcp)
   -h | --help           Show this help text
 EOF
             exit 0
             ;;
-
         --base-url)
-            ARGS+=( "$1" "$2" )   # keep the value as passed
+            ARGS+=( "$1" "$2" )
             shift 2
             ;;
-
         -m|--enable-mcp)
             enable_mcp_provided=true
             ARGS+=( "$1" )
             shift
             ;;
-
         --mcp-config)
             ARGS+=( "$1" "$2" )
             shift 2
             ;;
-
-        *)   # any other flag or positional argument
+        *)
             ARGS+=( "$1" )
             shift
             ;;
@@ -73,18 +62,21 @@ EOF
 done
 
 # ----------------------------------------------------------------- #
-# 3. Inject the defaults                                           #
+# 3. Inject defaults                                                #
 # ----------------------------------------------------------------- #
-
-# 3.1  Always add the default base‑URL if the user did not specify one
 if ! printf '%s\n' "${ARGS[@]}" | grep -q -- '--base-url'; then
     ARGS+=( "--base-url" "$DEFAULT_BASE_URL" )
 fi
 
-# 3.2  If the user requested MCP, add the config (unless he already supplied it)
 if $enable_mcp_provided; then
     if ! printf '%s\n' "${ARGS[@]}" | grep -q -- '--mcp-config'; then
         ARGS+=( "--mcp-config" "$MCP_CONFIG_FILE" )
     fi
 fi
-cd "$SCRIPT_DIR" && . .venv/bin/activate && PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" python standalone/chat/chat_client_standalone.py "${ARGS[@]}"
+
+# ----------------------------------------------------------------- #
+# 4. Launch using uv                                                #
+# ----------------------------------------------------------------- #
+cd "$SCRIPT_DIR"
+echo "🚀 Launching MixVLLM Chat via uv"
+uv run python "$APP_ENTRY" "${ARGS[@]}"
