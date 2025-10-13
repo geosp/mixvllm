@@ -39,6 +39,9 @@ services:
     ports:
       - "8888:8888"
 
+    volumes:
+      - /home/geo/develop/mixvllm/configs:/app/mixvllm/configs
+
     environment:
       - HF_TOKEN=${HF_TOKEN}
 
