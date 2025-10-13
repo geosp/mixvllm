@@ -55,6 +55,6 @@ services:
       - model-server
 
     command: >
-      sh -c ". /app/mixvllm/.venv/bin/activate && python /app/mixvllm/mixvllm/standalone/terminal/terminal_server_standalone.py --model-server-url http://model-server:8000 --host 0.0.0.0 --port 8888"
+      sh -c "cd /app/mixvllm && uv run python standalone/terminal/terminal_server_standalone.py --model-server-url http://model-server:8000 --host 0.0.0.0 --port 8888"
 
     restart: unless-stopped
