@@ -31,9 +31,10 @@ services:
     restart: unless-stopped
 
   terminal-server:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.terminal
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile.terminal
+    image: ghcr.io/geosp/mixvllm:main
     container_name: mixvllm-terminal-server
 
     ports:
@@ -41,6 +42,7 @@ services:
 
     volumes:
       - /home/geo/develop/mixvllm/configs:/app/mixvllm/configs
+      - ../standalone:/app/mixvllm/standalone
 
     environment:
       - HF_TOKEN=${HF_TOKEN}
@@ -54,6 +56,6 @@ services:
       - model-server
 
     command: >
-      sh -c "cd standalone/terminal && . .venv/bin/activate && python terminal_server_standalone.py --model-server-url http://model-server:8000 --host 0.0.0.0 --port 8888"
+      sh -c ". /app/mixvllm/.venv/bin/activate && python /app/mixvllm/standalone/terminal/terminal_server_standalone.py --model-server-url http://model-server:8000 --host 0.0.0.0 --port 8888"
 
     restart: unless-stopped
