@@ -41,7 +41,7 @@ ENV PATH=/app/mixvllm/.venv/bin:/home/mixvllm/.local/bin:${PATH}
 ENV VIRTUAL_ENV=/app/mixvllm/.venv
 
 # Copy the local repository contents into the container
-COPY --chown=mixvllm:mixvllm mixvllm/. /app/mixvllm/
+COPY --chown=mixvllm:mixvllm . /app/mixvllm/
 
 # Copy pyproject.toml to the mixvllm directory for installation
 COPY --chown=mixvllm:mixvllm pyproject.toml /app/mixvllm/pyproject.toml
@@ -63,8 +63,8 @@ RUN cd /app/mixvllm && . .venv/bin/activate && \
     uv pip install -e . --no-deps
 
 # Create separate venvs for standalone components
-RUN cd /app/mixvllm/standalone/chat && uv venv && uv pip install --no-cache prompt_toolkit rich pydantic requests openai pyyaml pylatexenc langchain-core langchain-ollama
-RUN cd /app/mixvllm/standalone/terminal && uv venv && uv pip install tornado terminado pydantic openai
+RUN cd /app/mixvllm/mixvllm/standalone/chat && uv venv && uv pip install --no-cache prompt_toolkit rich pydantic requests openai pyyaml pylatexenc langchain-core langchain-ollama
+RUN cd /app/mixvllm/mixvllm/standalone/terminal && uv venv && uv pip install tornado terminado pydantic openai
 
 # Make the convenience scripts executable
 RUN chmod +x /app/mixvllm/chat
