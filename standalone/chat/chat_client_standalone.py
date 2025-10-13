@@ -19,6 +19,10 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
+from rich.table import Table
+from rich.columns import Columns
+from rich.layout import Layout
+from rich.align import Align
 import openai
 
 # MCP imports
@@ -136,6 +140,184 @@ class ToolManager:
         return tool.execute(**arguments)
 
 
+# Enhanced formatting functions
+def format_user_message(message: str, console: Console) -> None:
+    """Format and display user message with nice styling."""
+    user_panel = Panel(
+        f"[bold cyan]{message}[/bold cyan]",
+        title="[bold blue]You[/bold blue]",
+        title_align="left",
+        border_style="blue",
+        padding=(1, 2)
+    )
+    console.print(user_panel)
+    console.print()
+
+def format_assistant_message(message: str, console: Console) -> None:
+    """Format and display assistant message with markdown and panel."""
+    # Use Rich's markdown for formatting
+    md = Markdown(message)
+    assistant_panel = Panel(
+        md,
+        title="[bold green]Assistant[/bold green]",
+        title_align="left",
+        border_style="green",
+        padding=(1, 2)
+    )
+    console.print(assistant_panel)
+    console.print()
+
+def format_tool_execution(tool_name: str, args: dict, console: Console) -> None:
+    """Format tool execution display."""
+    args_str = json.dumps(args, indent=2)
+    tool_panel = Panel(
+        f"[bold yellow]Executing:[/bold yellow] {tool_name}\n[cyan]Arguments:[/cyan]\n{args_str}",
+        title="[bold magenta]🔧 Tool Call[/bold magenta]",
+        title_align="left",
+        border_style="magenta",
+        padding=(1, 2)
+    )
+    console.print(tool_panel)
+
+def format_tool_result(tool_name: str, result: str, console: Console, show_raw_json: bool = False) -> None:
+    """Format tool result display with structured output."""
+    try:
+        # Try to parse as JSON and format nicely
+        result_data = json.loads(result)
+        if isinstance(result_data, dict):
+            # Handle weather data specifically
+            if "current_conditions" in result_data and "hourly_forecast" in result_data:
+                format_weather_result(result_data, console)
+                return
+            
+            # Generic structured data
+            table = Table(show_header=True, header_style="bold blue", show_lines=True)
+            
+            # Add a single row with the data
+            for key, value in result_data.items():
+                if isinstance(value, (dict, list)):
+                    table.add_column(key.replace("_", " ").title(), style="cyan")
+                else:
+                    table.add_column(key.replace("_", " ").title(), style="green")
+            
+            row_data = []
+            for key, value in result_data.items():
+                if isinstance(value, dict):
+                    row_data.append(json.dumps(value, indent=2))
+                elif isinstance(value, list):
+                    row_data.append(json.dumps(value, indent=2))
+                else:
+                    row_data.append(str(value))
+            table.add_row(*row_data)
+            
+            result_panel = Panel(
+                table,
+                title=f"[bold magenta]📊 {tool_name} Result[/bold magenta]",
+                title_align="left",
+                border_style="magenta",
+                padding=(1, 2)
+            )
+        else:
+            # Simple value
+            result_panel = Panel(
+                f"[green]{result}[/green]",
+                title=f"[bold magenta]📊 {tool_name} Result[/bold magenta]",
+                title_align="left",
+                border_style="magenta",
+                padding=(1, 2)
+            )
+    except (json.JSONDecodeError, TypeError):
+        # Not JSON, display as formatted text
+        result_panel = Panel(
+            f"[green]{result}[/green]",
+            title=f"[bold magenta]📊 {tool_name} Result[/bold magenta]",
+                title_align="left",
+                border_style="magenta",
+                padding=(1, 2)
+        )
+    
+    if show_raw_json:
+        console.print(result_panel)
+        console.print()
+
+def format_weather_result(weather_data: dict, console: Console) -> None:
+    """Special formatting for weather data."""
+    location = weather_data.get("location", "Unknown")
+    country = weather_data.get("country", "")
+    current = weather_data.get("current_conditions", {})
+    
+    # Current weather summary
+    weather_icon = "☀️" if "clear" in current.get("weather", "").lower() else "☁️" if "cloud" in current.get("weather", "").lower() else "🌧️"
+    
+    summary = f"""
+{weather_icon} **{location}** ({country})
+📅 {current.get('time', 'Now')}
+
+🌡️ **{current.get('temperature', {}).get('value', 'N/A')}°C** (feels like {current.get('feels_like', {}).get('value', 'N/A')}°C)
+💧 Humidity: {current.get('humidity', {}).get('value', 'N/A')}%
+💨 Wind: {current.get('wind', {}).get('speed', 'N/A')} km/h {current.get('wind', {}).get('direction', '')}
+🌤️ {current.get('weather', 'Unknown')}
+"""
+    
+    # Hourly forecast table
+    hourly = weather_data.get("hourly_forecast", [])
+    if hourly:
+        table = Table(show_header=True, header_style="bold blue", show_lines=False)
+        table.add_column("Time", style="cyan", justify="center")
+        table.add_column("Temp", style="green", justify="center")
+        table.add_column("Weather", style="yellow", justify="left")
+        table.add_column("Precip", style="blue", justify="center")
+        
+        for hour in hourly[:6]:  # Show next 6 hours
+            time_str = hour.get('time', '').split('T')[1][:5] if 'T' in hour.get('time', '') else hour.get('time', '')
+            temp = f"{hour.get('temperature', {}).get('value', 'N/A')}°C"
+            weather = hour.get('weather', 'Unknown')
+            precip = f"{hour.get('precipitation_probability', {}).get('value', 0)}%"
+            
+            table.add_row(time_str, temp, weather, precip)
+        
+        weather_panel = Panel(
+            Align.center(Markdown(summary.strip())), 
+            title="[bold cyan]🌤️ Weather Report[/bold cyan]",
+            title_align="center",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        console.print(weather_panel)
+        
+        forecast_panel = Panel(
+            table,
+            title="[bold blue]📅 Hourly Forecast[/bold blue]",
+            title_align="left",
+            border_style="blue",
+            padding=(1, 2)
+        )
+        console.print(forecast_panel)
+    else:
+        weather_panel = Panel(
+            Markdown(summary.strip()),
+            title="[bold cyan]🌤️ Current Weather[/bold cyan]",
+            title_align="center",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        console.print(weather_panel)
+    
+    console.print()
+
+def format_error(message: str, console: Console) -> None:
+    """Format error messages."""
+    error_panel = Panel(
+        f"[bold red]{message}[/bold red]",
+        title="[bold red]❌ Error[/bold red]",
+        title_align="left",
+        border_style="red",
+        padding=(1, 2)
+    )
+    console.print(error_panel)
+    console.print()
+
+
 def chat_loop(config: ChatConfig):
     """Main chat loop."""
     console = Console()
@@ -180,6 +362,9 @@ def chat_loop(config: ChatConfig):
             # Add user message
             messages.append({"role": "user", "content": user_input})
 
+            # Display user message with nice formatting
+            format_user_message(user_input, console)
+
             # Get response from server
             try:
                 # Prepare API call parameters
@@ -204,12 +389,11 @@ def chat_loop(config: ChatConfig):
                 if config.stream:
                     # Streaming response with tool handling
                     tool_calls = []
-                    console.print("Assistant: ", end="")
+                    full_response = ""  # Initialize full_response
                     
                     for chunk in response:
                         if chunk.choices[0].delta.content:
                             content = chunk.choices[0].delta.content
-                            console.print(content, end="")
                             full_response += content
                         
                         # Handle tool calls in streaming
@@ -228,49 +412,9 @@ def chat_loop(config: ChatConfig):
                                     if tool_call_delta.function.arguments:
                                         tool_calls[tool_call_delta.index]['function']['arguments'] += tool_call_delta.function.arguments
                     
-                    console.print()  # New line
-                    
-                    # Execute tool calls if any
-                    if tool_calls:
-                        for tool_call in tool_calls:
-                            if 'function' in tool_call:
-                                tool_name = tool_call['function']['name']
-                                try:
-                                    tool_args = json.loads(tool_call['function']['arguments'])
-                                    console.print(f"[dim]Executing tool: {tool_name}[/dim]")
-                                    tool_result = tool_manager.execute_tool(tool_name, tool_args)
-                                    console.print(f"[dim]Tool result: {tool_result}[/dim]")
-                                    
-                                    # Add tool call and result to messages
-                                    messages.append({
-                                        "role": "assistant",
-                                        "content": full_response,
-                                        "tool_calls": [{
-                                            "id": tool_call.get('id'),
-                                            "type": "function",
-                                            "function": tool_call['function']
-                                        }]
-                                    })
-                                    messages.append({
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.get('id'),
-                                        "content": tool_result
-                                    })
-                                    
-                                    # Get follow-up response
-                                    followup_response = client.chat.completions.create(
-                                        model=config.model or "default",
-                                        messages=messages,
-                                        temperature=config.temperature,
-                                        max_tokens=config.max_tokens,
-                                        stream=False
-                                    )
-                                    followup_content = followup_response.choices[0].message.content
-                                    console.print(f"Assistant: {followup_content}")
-                                    full_response += followup_content
-                                    
-                                except Exception as e:
-                                    console.print(f"[red]Tool execution error: {e}[/red]")
+                    # Format the assistant response properly
+                    if full_response.strip():
+                        format_assistant_message(full_response, console)
                 else:
                     # Non-streaming response handling
                     assistant_message = response.choices[0].message
@@ -283,9 +427,8 @@ def chat_loop(config: ChatConfig):
                             tool_name = tool_call.function.name
                             try:
                                 tool_args = json.loads(tool_call.function.arguments)
-                                console.print(f"[dim]Executing tool: {tool_name}[/dim]")
+                                format_tool_execution(tool_name, tool_args, console)
                                 tool_result = tool_manager.execute_tool(tool_name, tool_args)
-                                console.print(f"[dim]Tool result: {tool_result}[/dim]")
                                 
                                 # Add tool call and result to messages
                                 messages.append({
@@ -315,11 +458,11 @@ def chat_loop(config: ChatConfig):
                                     stream=False
                                 )
                                 followup_content = followup_response.choices[0].message.content
-                                console.print(f"Assistant: {followup_content}")
+                                format_assistant_message(followup_content, console)
                                 full_response += followup_content
                                 
                             except Exception as e:
-                                console.print(f"[red]Tool execution error: {e}[/red]")
+                                format_error(f"Tool execution error: {e}", console)
                     else:
                         # Check if response looks like a tool call in JSON format
                         if config.enable_mcp and tool_manager.has_tools() and full_response.strip().startswith('{') and full_response.strip().endswith('}'):
@@ -336,9 +479,8 @@ def chat_loop(config: ChatConfig):
                                         provided_params = set(tool_args.keys())
                                         if provided_params.issubset(expected_params) or len(provided_params.intersection(expected_params)) > 0:
                                             # Execute the tool
-                                            console.print(f"[dim]Detected tool call for: {tool_name}[/dim]")
+                                            format_tool_execution(tool_name, tool_args, console)
                                             tool_result = tool_manager.execute_tool(tool_name, tool_args)
-                                            console.print(f"[dim]Tool result: {tool_result}[/dim]")
                                             
                                             # Add the original response and tool call to messages
                                             messages.append({"role": "assistant", "content": full_response})
@@ -357,27 +499,27 @@ def chat_loop(config: ChatConfig):
                                                 stream=False
                                             )
                                             followup_content = followup_response.choices[0].message.content
-                                            console.print(f"Assistant: {followup_content}")
+                                            format_assistant_message(followup_content, console)
                                             full_response += followup_content
                                             executed_tool = True
                                             break
                                 
                                 if not executed_tool:
                                     # No matching tool found, just print the response
-                                    console.print(f"Assistant: {full_response}")
+                                    format_assistant_message(full_response, console)
                             except (json.JSONDecodeError, Exception) as e:
                                 # Not valid JSON or other error, just print the response
-                                console.print(f"Assistant: {full_response}")
+                                format_assistant_message(full_response, console)
                         else:
                             # Simple response without tools
-                            console.print(f"Assistant: {full_response}")
+                            format_assistant_message(full_response, console)
                 
                 # Add final assistant response to history (skip if we already added tool call responses)
                 if not (hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls):
                     messages.append({"role": "assistant", "content": full_response})
 
             except Exception as e:
-                console.print(f"[red]Error communicating with server: {e}[/red]")
+                format_error(f"Error communicating with server: {e}", console)
                 continue
 
         except KeyboardInterrupt:
