@@ -23,7 +23,7 @@ import tornado.web
 import tornado.ioloop
 from terminado import TermSocket, UniqueTermManager
 
-from .config import TerminalConfig
+from .terminal_config import TerminalConfig
 
 logger = logging.getLogger(__name__)
 

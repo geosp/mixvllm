@@ -34,8 +34,8 @@ dev = [
 
 [project.scripts]
 mixvllm-serve = "mixvllm.cli.serve_model:main"
-mixvllm-chat = "mixvllm.client:main"
-mixvllm-terminal-server = "mixvllm.cli.terminal_server:main"
+mixvllm-chat = "chat_client_standalone:main"
+mixvllm-terminal-server = "terminal_server_standalone:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,15 @@
+[project]
+name = "mixvllm-terminal-server"
+version = "0.1.0"
+description = "Standalone terminal server for MixVLLM"
+requires-python = ">=3.10"
+dependencies = [
+    "tornado>=6.4.0",
+    "terminado>=0.18.0",
+    "pydantic>=2.0.0",
+    "openai>=2.2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -87,4 +87,8 @@ if $enable_mcp_provided; then
         ARGS+=( "--mcp-config" "$MCP_CONFIG_FILE" )
     fi
 fi
-cd "$SCRIPT_DIR/standalone/chat" && . .venv/bin/activate && python chat_client_standalone.py "${ARGS[@]}"
+
+# ----------------------------------------------------------------- #
+# 4. Execute the real command                                      #
+# ----------------------------------------------------------------- #
+cd "$SCRIPT_DIR/standalone/chat" && . .venv/bin/activate && python chat_client_standalone.py "${ARGS[@]}"cd "$SCRIPT_DIR/standalone/chat" && . .venv/bin/activate && python chat_client_standalone.py "${ARGS[@]}"

@@ -21,7 +21,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from mixvllm.inference.terminal_server import start_terminal_server
-from mixvllm.inference.config import TerminalConfig
+from mixvllm.inference.terminal_config import TerminalConfig
 
 
 def main():

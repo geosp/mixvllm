@@ -8,7 +8,12 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
 
 
 class ModelConfig(BaseModel):
@@ -77,29 +82,6 @@ class ServerConfig(BaseModel):
     )
 
 
-class TerminalConfig(BaseModel):
-    """Configuration for the web terminal server."""
-
-    enabled: bool = Field(
-        default=False,
-        description="Enable web terminal access"
-    )
-    host: str = Field(
-        default="0.0.0.0",
-        description="Terminal server host address"
-    )
-    port: int = Field(
-        default=8888,
-        ge=1,
-        le=65535,
-        description="Terminal server port number"
-    )
-    auto_start_chat: bool = Field(
-        default=True,
-        description="Automatically start mixvllm-chat on terminal connection"
-    )
-
-
 class GenerationDefaults(BaseModel):
     """Default settings for text generation."""
 
@@ -141,9 +123,6 @@ class ServeConfig(BaseModel):
     model: ModelConfig
     inference: InferenceConfig
     server: ServerConfig
-    terminal: TerminalConfig = Field(
-        default_factory=TerminalConfig
-    )
     generation_defaults: GenerationDefaults = Field(
         default_factory=GenerationDefaults
     )

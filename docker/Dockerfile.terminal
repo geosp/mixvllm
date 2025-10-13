@@ -1,0 +1,85 @@
+# Minimal Terminal Server Image
+# Lightweight container for running the MixVLLM web terminal server
+# No GPU dependencies, CUDA, or vLLM - just the terminal interface
+
+FROM python:3.11-slim
+
+LABEL maintainer="Geovanny Fajardo <gffajardo@gmail.com>"
+LABEL description="MixVLLM Terminal Server - Lightweight web terminal interface"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install minimal system dependencies for terminal server
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    build-essential \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (Universal Python package manager)
+RUN pip install --no-cache-dir uv
+
+# Create a non-root user with sudo privileges
+RUN groupadd --gid 1000 mixvllm && \
+    useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash mixvllm && \
+    echo "mixvllm ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/mixvllm && \
+    chmod 0440 /etc/sudoers.d/mixvllm
+
+# Create app directories and set ownership
+RUN mkdir -p /app/mixvllm && chown -R mixvllm:mixvllm /app
+
+# Set working directory
+WORKDIR /app/mixvllm
+
+# Switch to non-root user
+USER mixvllm
+
+# Set environment variables
+ENV PATH=/app/mixvllm/.venv/bin:/home/mixvllm/.local/bin:${PATH}
+ENV VIRTUAL_ENV=/app/mixvllm/.venv
+
+# Copy the local repository contents into the container
+COPY --chown=mixvllm:mixvllm . /app/mixvllm/
+
+# Copy pyproject.toml to the mixvllm directory for installation
+COPY --chown=mixvllm:mixvllm pyproject.toml /app/mixvllm/pyproject.toml
+
+# Create a virtual environment
+RUN cd /app/mixvllm && uv venv
+
+# Install only the terminal server dependencies
+# We don't need vLLM, CUDA, or GPU dependencies
+RUN cd /app/mixvllm && . .venv/bin/activate && \
+    uv pip install \
+        tornado \
+        terminado \
+        prompt_toolkit \
+        rich \
+        pydantic \
+        openai \
+        && \
+    uv pip install -e . --no-deps
+
+# Create separate venvs for standalone components
+RUN cd /app/mixvllm/standalone/chat && uv venv && uv pip install prompt_toolkit rich pydantic requests openai pyyaml
+RUN cd /app/mixvllm/standalone/terminal && uv venv && uv pip install tornado terminado pydantic openai
+
+# Make the convenience scripts executable
+RUN chmod +x /app/mixvllm/chat
+
+# Add the scripts to the PATH
+ENV PATH=${PATH}:/app/mixvllm
+
+# Expose the terminal server port
+EXPOSE 8888
+
+# Verify the installation
+RUN ls -la /app/mixvllm/chat && \
+    echo "PATH: $PATH" && \
+    python -c "import tornado, terminado; print('Terminal dependencies installed')"
+
+# Default command runs the terminal server
+# Can be overridden in docker-compose or docker run
+CMD ["sh", "-c", "cd standalone/terminal && . .venv/bin/activate && python terminal_server_standalone.py --model-server-url http://localhost:8000 --host 0.0.0.0 --port 8888"]
