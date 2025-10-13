@@ -8,10 +8,28 @@ mixvllm.client components instead of reimplementing functionality.
 
 import argparse
 import sys
+import os
 
 # Import the existing client components
 from mixvllm.client.config import ChatConfig
 from mixvllm.client.chat_client import ChatClient
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style
+
+
+def create_prompt_session():
+    """Create an enhanced prompt session with history and styling."""
+    style = Style.from_dict({
+        'prompt': 'bold cyan',
+    })
+    history_file = os.path.expanduser("~/.mixvllm_chat_history")
+    return PromptSession(
+        history=FileHistory(history_file),
+        style=style,
+        message="You: "
+    )
 
 
 def main():
@@ -91,10 +109,13 @@ def main():
         tools_count = len(client.tool_manager.mcp_tools) if hasattr(client.tool_manager, 'mcp_tools') else 0
         client.ui_manager.show_welcome(client.config.model, tools_count)
 
+        # Setup enhanced input
+        session = create_prompt_session()
+
         # Main chat loop using the existing client's chat method
         while True:
             try:
-                user_input = input("You: ").strip()
+                user_input = session.prompt().strip()
 
                 if not user_input:
                     continue
