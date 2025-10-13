@@ -20,6 +20,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.markdown import Markdown
 from rich.live import Live
+import re
 
 from .config import ChatConfig
 
@@ -119,8 +120,6 @@ class ResponseHandler:
             # - keep_comments=False: Remove % comments from output
             # - strict_latex_spaces=False: Handle spacing issues gracefully
             
-            import re
-            
             # Only convert specific LaTeX patterns, not the entire content
             # Handle display math blocks \[...\] and $$...$$
             def convert_display_math(match):
@@ -161,7 +160,6 @@ class ResponseHandler:
             has_latex = any(cmd in content for cmd in latex_commands)
             if has_latex:
                 # Unescape double backslashes that may have been added during JSON/HTML processing
-                import re
                 content = re.sub(r'\\+', r'\\', content)
                 
                 try:
@@ -176,25 +174,167 @@ class ResponseHandler:
                 except:
                     # If full conversion fails, keep original content
                     pass
+        
         except ImportError:
             # Fallback to manual replacements if pylatexenc not available
-            replacements = {
+            # First, handle complex expressions that need regex processing
+            
+            # Handle fractions \frac{numerator}{denominator}
+            def replace_frac(match):
+                numerator = match.group(1)
+                denominator = match.group(2)
+                # Simple fraction conversion - could be improved
+                return f"{numerator}/{denominator}"
+            
+            content = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', replace_frac, content)
+            
+            # Handle integrals with limits \int_{lower}^{upper}
+            def replace_integral(match):
+                lower = match.group(1)
+                upper = match.group(2)
+                return f"∫_{lower}^{upper}"
+            
+            content = re.sub(r'\\int_\{([^}]+)\}\^\{([^}]+)\}', replace_integral, content)
+            
+            # Handle simple integrals without limits
+            content = content.replace('\\int', '∫')
+            
+            # Handle superscripts ^{...}
+            def replace_superscript(match):
+                superscript = match.group(1)
+                # Convert common superscript characters
+                superscript_map = {
+                    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
+                    '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻', '+': '⁺',
+                    '(': '⁽', ')': '⁾', '=': '⁼', 'n': 'ⁿ', 'i': 'ⁱ', 'x': 'ˣ',
+                    'a': 'ᵃ', 'b': 'ᵇ', 'c': 'ᶜ', 'd': 'ᵈ', 'e': 'ᵉ', 'f': 'ᶠ',
+                    'g': 'ᵍ', 'h': 'ʰ', 'j': 'ʲ', 'k': 'ᵏ', 'l': 'ˡ', 'm': 'ᵐ',
+                    'o': 'ᵒ', 'p': 'ᵖ', 'r': 'ʳ', 's': 'ˢ', 't': 'ᵗ', 'u': 'ᵘ',
+                    'v': 'ᵛ', 'w': 'ʷ'
+                }
+                converted = ''.join(superscript_map.get(char, char) for char in superscript)
+                return converted
+            
+            content = re.sub(r'\^\{([^}]+)\}', replace_superscript, content)
+            
+            # Handle subscripts _{...}
+            def replace_subscript(match):
+                subscript = match.group(1)
+                # Convert common subscript characters
+                subscript_map = {
+                    '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅',
+                    '6': '₆', '7': '₇', '8': '₈', '9': '₉', '-': '₋', '+': '₊',
+                    '(': '₍', ')': '₎', '=': '₌', 'a': 'ₐ', 'b': 'ᵦ', 'c': '꜀',
+                    'd': 'ᵪ', 'e': 'ₑ', 'f': '꜀', 'g': 'ᷚ', 'h': 'ₕ', 'i': 'ᵢ',
+                    'j': 'ⱼ', 'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ',
+                    'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ', 'v': 'ᵥ',
+                    'w': 'ᵥ', 'x': 'ₓ', 'y': 'ᵧ', 'z': '₂'
+                }
+                converted = ''.join(subscript_map.get(char, char) for char in subscript)
+                return converted
+            
+            content = re.sub(r'_\{([^}]+)\}', replace_subscript, content)
+            
+            # Now handle simple symbol replacements
+            symbol_replacements = {
                 r'\\mu': 'μ', r'\\nu': 'ν', r'\\Lambda': 'Λ', r'\\lambda': 'λ',
                 r'\\gamma': 'γ', r'\\alpha': 'α', r'\\beta': 'β', r'\\delta': 'δ',
                 r'\\Delta': 'Δ', r'\\pi': 'π', r'\\sigma': 'σ', r'\\theta': 'θ',
                 r'\\phi': 'φ', r'\\psi': 'ψ', r'\\omega': 'ω', r'\\Omega': 'Ω',
                 r'\\infty': '∞', r'\\approx': '≈', r'\\neq': '≠', r'\\leq': '≤',
                 r'\\geq': '≥', r'\\pm': '±', r'\\times': '×', r'\\cdot': '·',
-                r'\\partial': '∂', r'\\nabla': '∇', r'\\sum': '∑', r'\\int': '∫',
-                r'\\sqrt': '√', r'\\frac': '/', r'\\^{2}': '²', r'\\^{3}': '³',
+                r'\\partial': '∂', r'\\nabla': '∇', r'\\sum': '∑', r'\\sqrt': '√',
+                r'\\quad': ' ', r'\\text': '', r'\\big': '', r'\\left': '', r'\\right': '',
+                r'\\,': ' ', r'\\;': ' ', r'\\!': '', r'\\:': ' ',
+                # Additional common LaTeX commands
+                r'\\cos': 'cos', r'\\sin': 'sin', r'\\tan': 'tan', r'\\log': 'log',
+                r'\\ln': 'ln', r'\\exp': 'exp', r'\\lim': 'lim', r'\\max': 'max',
+                r'\\min': 'min', r'\\sup': 'sup', r'\\inf': 'inf', r'\\det': 'det',
+                r'\\dim': 'dim', r'\\ker': 'ker', r'\\deg': 'deg', r'\\arg': 'arg',
+                r'\\Re': 'Re', r'\\Im': 'Im', r'\\forall': '∀', r'\\exists': '∃',
+                r'\\in': '∈', r'\\notin': '∉', r'\\subset': '⊂', r'\\subseteq': '⊆',
+                r'\\supset': '⊃', r'\\supseteq': '⊇', r'\\cap': '∩', r'\\cup': '∪',
+                r'\\emptyset': '∅', r'\\mathbb\{R\}': 'ℝ', r'\\mathbb\{N\}': 'ℕ',
+                r'\\mathbb\{Z\}': 'ℤ', r'\\mathbb\{Q\}': 'ℚ', r'\\mathbb\{C\}': 'ℂ',
+                # Text commands that should be removed
+                r'\\text\{([^}]*)\}': r'\1',  # \text{word} → word
+                r'\\mathrm\{([^}]*)\}': r'\1',  # \mathrm{word} → word
+                r'\\mathbf\{([^}]*)\}': r'\1',  # \mathbf{word} → word
+                r'\\mathit\{([^}]*)\}': r'\1',  # \mathit{word} → word
+                r'\\mathcal\{([^}]*)\}': r'\1',  # \mathcal{word} → word
             }
             
-            for latex, unicode_char in replacements.items():
+            for latex, unicode_char in symbol_replacements.items():
                 content = content.replace(latex, unicode_char)
             
-            # Clean up LaTeX brackets but preserve markdown
-            import re
-            content = re.sub(r'\\\[|\\\]', '', content)
+            # Clean up remaining LaTeX artifacts
+            content = re.sub(r'\\\[|\\\]', '', content)  # Remove display math delimiters
+            content = re.sub(r'\{([^}]*)\}', r'\1', content)  # Remove remaining braces
+            
+            # Handle specific text commands that might not have been caught
+            content = re.sub(r'\\textfor', 'for', content)
+            content = re.sub(r'\\textand', 'and', content)
+            content = re.sub(r'\\texton', 'on', content)
+            content = re.sub(r'\\textis', 'is', content)
+            content = re.sub(r'\\textthen', 'then', content)
+            content = re.sub(r'\\textif', 'if', content)
+        
+        # Always check for and convert caret superscript notation (^2, ^n, etc.)
+        # This handles cases without full LaTeX commands
+        if '^' in content:
+            content = self._convert_caret_superscripts(content)
+            
+            # Manual replacements for common symbols that might not be in math mode
+            symbol_replacements = {
+                r'\\mu': 'μ', r'\\nu': 'ν', r'\\Lambda': 'Λ', r'\\lambda': 'λ',
+                r'\\gamma': 'γ', r'\\alpha': 'α', r'\\beta': 'β', r'\\delta': 'δ',
+                r'\\Delta': 'Δ', r'\\pi': 'π', r'\\sigma': 'σ', r'\\theta': 'θ',
+                r'\\phi': 'φ', r'\\psi': 'ψ', r'\\omega': 'ω', r'\\Omega': 'Ω',
+            }
+            
+            for latex_symbol, unicode_char in symbol_replacements.items():
+                content = content.replace(latex_symbol, unicode_char)
+                
+        return content
+
+    def _convert_caret_superscripts(self, content: str) -> str:
+        """Convert caret superscript notation (^...) to Unicode superscript characters.
+        
+        This post-processes pylatexenc output to convert remaining caret notation
+        like ^2, ^{-x}, ^{n+1} to proper Unicode superscripts like ², ⁻ˣ, ⁿ⁺¹.
+        
+        Args:
+            content: Text that may contain caret superscript notation
+            
+        Returns:
+            str: Text with caret superscripts converted to Unicode where possible
+        """
+        import re
+        
+        # Unicode superscript character mapping
+        superscript_map = {
+            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
+            '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻', '+': '⁺',
+            '(': '⁽', ')': '⁾', '=': '⁼', 'n': 'ⁿ', 'i': 'ⁱ', 'x': 'ˣ',
+            'y': 'ʸ', 'z': 'ᶻ', 'a': 'ᵃ', 'b': 'ᵇ', 'c': 'ᶜ', 'd': 'ᵈ',
+            'e': 'ᵉ', 'f': 'ᶠ', 'g': 'ᵍ', 'h': 'ʰ', 'j': 'ʲ', 'k': 'ᵏ',
+            'l': 'ˡ', 'm': 'ᵐ', 'o': 'ᵒ', 'p': 'ᵖ', 'r': 'ʳ', 's': 'ˢ',
+            't': 'ᵗ', 'u': 'ᵘ', 'v': 'ᵛ', 'w': 'ʷ', '∞': '∞'
+        }
+        
+        # Convert ^... patterns to Unicode superscripts
+        # Match ^ followed by a reasonable superscript (short sequence)
+        def convert_superscript(match):
+            superscript_text = match.group(1)
+            # Convert each character in the superscript to Unicode superscript
+            converted = ''.join(superscript_map.get(char, char) for char in superscript_text)
+            return converted
+        
+        # Pattern for superscripts: prefer shorter, simpler superscripts
+        # Match ^ followed by digits, letters, or simple symbols (no operators)
+        # Use non-greedy matching to prefer shorter matches
+        superscript_pattern = r'\^([\d∞a-zA-Z-]{1,5})'
+        content = re.sub(superscript_pattern, convert_superscript, content)
         
         return content
 
@@ -405,47 +545,6 @@ class ResponseHandler:
             else:
                 print(f"❌ {error_msg}")
             return error_msg
-
-    def _convert_caret_superscripts(self, content: str) -> str:
-        """Convert caret superscript notation (^...) to Unicode superscript characters.
-        
-        This post-processes pylatexenc output to convert remaining caret notation
-        like ^2, ^{-x}, ^{n+1} to proper Unicode superscripts like ², ⁻ˣ, ⁿ⁺¹.
-        
-        Args:
-            content: Text that may contain caret superscript notation
-            
-        Returns:
-            str: Text with caret superscripts converted to Unicode where possible
-        """
-        import re
-        
-        # Unicode superscript character mapping
-        superscript_map = {
-            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
-            '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻', '+': '⁺',
-            '(': '⁽', ')': '⁾', '=': '⁼', 'n': 'ⁿ', 'i': 'ⁱ', 'x': 'ˣ',
-            'y': 'ʸ', 'z': 'ᶻ', 'a': 'ᵃ', 'b': 'ᵇ', 'c': 'ᶜ', 'd': 'ᵈ',
-            'e': 'ᵉ', 'f': 'ᶠ', 'g': 'ᵍ', 'h': 'ʰ', 'j': 'ʲ', 'k': 'ᵏ',
-            'l': 'ˡ', 'm': 'ᵐ', 'o': 'ᵒ', 'p': 'ᵖ', 'r': 'ʳ', 's': 'ˢ',
-            't': 'ᵗ', 'u': 'ᵘ', 'v': 'ᵛ', 'w': 'ʷ', '∞': '∞'
-        }
-        
-        # Convert ^... patterns to Unicode superscripts
-        # Match ^ followed by a reasonable superscript (short sequence)
-        def convert_superscript(match):
-            superscript_text = match.group(1)
-            # Convert each character in the superscript to Unicode superscript
-            converted = ''.join(superscript_map.get(char, char) for char in superscript_text)
-            return converted
-        
-        # Pattern for superscripts: prefer shorter, simpler superscripts
-        # Match ^ followed by digits, letters, or simple symbols (no operators)
-        # Use non-greedy matching to prefer shorter matches
-        superscript_pattern = r'\^([\d∞a-zA-Z-]{1,5})'
-        content = re.sub(superscript_pattern, convert_superscript, content)
-        
-        return content
 
 
 # ============================================================================

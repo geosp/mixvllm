@@ -200,36 +200,8 @@ def get_available_mcp_tools(config_path: Optional[str] = None) -> List[Any]:
         return langchain_tools
 
     except ImportError:
-        # LangChain not available - return simple tool objects with _run method
-        tools = _discover_mcp_tools(config_path)
-        
-        simple_tools = []
-        for tool_name, tool_info in tools.items():
-            # Create a simple tool object that mimics LangChain interface
-            class SimpleMCPTool:
-                def __init__(self, name, description, tool_func):
-                    self.name = name
-                    self.description = description
-                    self._tool_func = tool_func
-                
-                def _run(self, **kwargs):
-                    try:
-                        # Call the async tool function
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        try:
-                            result = loop.run_until_complete(self._tool_func(**kwargs))
-                            return result
-                        finally:
-                            loop.close()
-                    except Exception as e:
-                        return f"Tool execution error: {e}"
-            
-            tool_obj = SimpleMCPTool(tool_name, tool_info['description'], tool_info['function'])
-            simple_tools.append(tool_obj)
-        
-        return simple_tools
+        # Return empty list if LangChain not available
+        return []
 
 
 def get_mcp_tool_names() -> List[str]:

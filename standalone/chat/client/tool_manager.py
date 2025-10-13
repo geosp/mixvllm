@@ -22,62 +22,30 @@ class ToolManager:
     def _setup_mcp_agent(self):
         """Set up the MCP-enabled tools."""
         try:
-            from .utils.mcp_tools import _discover_mcp_tools
+            from .utils.mcp_tools import get_available_mcp_tools
 
-            # Get raw MCP tools (bypass LangChain requirement)
-            tools_dict = _discover_mcp_tools(self.config.mcp_config_path)
+            # For now, disable the LangChain agent and use direct MCP tool calling
+            # This avoids complex LangChain integration issues
+            tools = get_available_mcp_tools(self.config.mcp_config_path)
 
-            if not tools_dict:
-                # Don't fail completely - just warn and continue without MCP
-                if self.console:
-                    self.console.print("[yellow]⚠[/yellow] MCP servers not responding - continuing without MCP tools")
-                    self.console.print("[dim]MCP protocol or server compatibility issue[/dim]")
-                else:
-                    print("⚠ MCP servers not responding - continuing without MCP tools")
-                    print("MCP protocol or server compatibility issue")
-                self.config.enable_mcp = False
-                return
+            if not tools:
+                raise ValueError("No MCP tools available")
 
-            # Create simple tool objects that mimic the interface expected by execute_tool
-            self.mcp_tools = {}
-            for tool_name, tool_info in tools_dict.items():
-                # Create a simple tool object with _run method
-                class SimpleMCPTool:
-                    def __init__(self, name, description, tool_func):
-                        self.name = name
-                        self.description = description
-                        self._tool_func = tool_func
-
-                    def _run(self, **kwargs):
-                        try:
-                            # Call the async tool function
-                            import asyncio
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            try:
-                                result = loop.run_until_complete(self._tool_func(**kwargs))
-                                return result
-                            finally:
-                                loop.close()
-                        except Exception as e:
-                            return f"Tool execution error: {e}"
-
-                tool_obj = SimpleMCPTool(tool_name, tool_info['description'], tool_info['function'])
-                self.mcp_tools[tool_name] = tool_obj
+            # Store tools for direct calling instead of using LangChain agent
+            self.mcp_tools = {tool.name: tool for tool in tools}
 
             if self.console:
-                self.console.print(f"[green]✓[/green] MCP tools enabled ({len(self.mcp_tools)} tools available)")
+                self.console.print(f"[green]✓[/green] MCP tools enabled ({len(tools)} tools available)")
             else:
-                print(f"✓ MCP tools enabled ({len(self.mcp_tools)} tools available)")
+                print(f"✓ MCP tools enabled ({len(tools)} tools available)")
 
         except Exception as e:
-            # Don't fail completely - just warn and continue without MCP
             if self.console:
-                self.console.print(f"[yellow]⚠[/yellow] MCP setup failed: {e}")
-                self.console.print("[dim]Continuing without MCP tools[/dim]")
+                self.console.print(f"[yellow]⚠[/yellow] Failed to setup MCP agent: {e}")
+                self.console.print("[dim]Falling back to simple chat mode[/dim]")
             else:
-                print(f"⚠ MCP setup failed: {e}")
-                print("Continuing without MCP tools")
+                print(f"⚠ Failed to setup MCP agent: {e}")
+                print("Falling back to simple chat mode")
             self.config.enable_mcp = False
 
     def execute_tool(self, tool_name: str, params: dict) -> Optional[str]:

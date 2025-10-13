@@ -239,8 +239,8 @@ class MCPConfig:
 
     def __init__(self, config_path: Optional[str] = None):
         if config_path is None:
-            # Default path relative to this file - go up to project root
-            config_path = Path(__file__).parent.parent.parent.parent / "configs" / "mcp_servers.yaml"
+            # Default path relative to this file
+            config_path = Path(__file__).parent.parent.parent / "configs" / "mcp_servers.yaml"
 
         self.config_path = Path(config_path)
         self._config = None

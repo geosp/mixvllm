@@ -34,8 +34,8 @@ dev = [
 
 [project.scripts]
 mixvllm-serve = "mixvllm.cli.serve_model:main"
-mixvllm-chat = "chat_client_standalone:main"
-mixvllm-terminal-server = "terminal_server_standalone:main"
+mixvllm-chat = "standalone.chat.chat_client_standalone:main"
+mixvllm-terminal-server = "standalone.terminal.terminal_server_standalone:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -65,4 +65,5 @@ disallow_untyped_defs = true
 [dependency-groups]
 dev = [
     "huggingface-hub[cli]>=0.35.3",
+    "pytest-cov>=7.0.0",
 ]

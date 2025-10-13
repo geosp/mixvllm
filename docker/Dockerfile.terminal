@@ -63,7 +63,7 @@ RUN cd /app/mixvllm && . .venv/bin/activate && \
     uv pip install -e . --no-deps
 
 # Create separate venvs for standalone components
-RUN cd /app/mixvllm/standalone/chat && uv venv && uv pip install prompt_toolkit rich pydantic requests openai pyyaml
+RUN cd /app/mixvllm/standalone/chat && uv venv && uv pip install --no-cache prompt_toolkit rich pydantic requests openai pyyaml pylatexenc langchain-core langchain-ollama
 RUN cd /app/mixvllm/standalone/terminal && uv venv && uv pip install tornado terminado pydantic openai
 
 # Make the convenience scripts executable
