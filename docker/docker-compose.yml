@@ -1,53 +1,33 @@
-networks:
-  mixvllm-net:
-    name: mixvllm-net
+version: '3.8'
 
 services:
-  # KNOWN LIMITATION: vLLM v0.11.0 (v1 engine) has issues with multi-GPU
-  # tensor parallelism in Docker containers. Workers fail during initialization
-  # due to IPC/shared memory communication issues. This works perfectly on the host.
-  #
-  # Workaround options:
-  # 1. Use single GPU in Docker (this configuration)
-  # 2. Run directly on host for multi-GPU support
-  # 3. Wait for vLLM bug fix in future releases
-
   mixvllm-server:
-    image: mixvllm:latest
+    image: vllm/vllm-openai:latest
     container_name: mixvllm-server
 
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        launch --model gpt-oss-20b --terminal &
-        wait
-
     ports:
-      - "8000:8000"   # Model server API
-      - "8888:8888"   # Web terminal
+      - "8000:8000"
 
     volumes:
-      - ~/.cache/huggingface:/home/mixvllm/.cache/huggingface
+      - ~/.cache/huggingface:/root/.cache/huggingface
+
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
 
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 2
+              count: all
               capabilities: [gpu]
 
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
-      # - NVIDIA_VISIBLE_DEVICES=0  # Use first GPU only
-      - VLLM_LOGGING_LEVEL=INFO
+    ipc: host
 
-    networks:
-      - mixvllm-net
+    command: >
+      --model openai/gpt-oss-20b
+      --tensor-parallel-size 2
+      --gpu-memory-utilization 0.85
+      --max-num-seqs 32
 
-    restart: always
-    
-    # Note: This configuration:
-    # 1. Copies all files from the repository to the container
-    # 2. Fixes pyproject.toml by removing the README.md reference
-    # 3. Installs the package in development mode with all dependencies
+    restart: unless-stopped
