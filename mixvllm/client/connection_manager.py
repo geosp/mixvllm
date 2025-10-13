@@ -62,58 +62,60 @@ class ConnectionManager:
         # Fallback to print() if Rich not available
 
     def test_connection(self) -> bool:
-        """Test connection to the vLLM server using health endpoint.
+        """Test connection to the server using health endpoint or models endpoint.
 
-        The /health endpoint is a standard health check provided by vLLM:
-        - Returns 200 OK if server is running and healthy
-        - Fast response (no model inference involved)
-        - Good practice for connection verification before operations
+        First tries the vLLM /health endpoint, then falls back to /v1/models
+        for OpenAI-compatible servers like Ollama that don't have /health.
 
         Returns:
             bool: True if server is reachable and healthy, False otherwise
-
-        HTTP Status Codes:
-            200: Server healthy and ready
-            503: Server starting up or unhealthy
-            Other: Unexpected server state
         """
         try:
-            # Issue GET request to health endpoint
-            # Using self.session leverages connection pooling
+            # First try vLLM health endpoint
             response = self.session.get(f"{self.config.base_url}/health")
-
             if response.status_code == 200:
-                # Success: Server is healthy
                 if self.console:
-                    # Rich markup: [green] = green color, ✓ = checkmark emoji
                     self.console.print(f"[green]✓[/green] Connected to vLLM server at {self.config.base_url}")
                 else:
-                    # Fallback: plain text without colors
                     print(f"✓ Connected to vLLM server at {self.config.base_url}")
                 return True
-            else:
-                # Non-200 status: Server responded but not healthy
+            elif response.status_code == 503:
+                # 503 means server is starting up, which is acceptable
                 if self.console:
-                    # [yellow] = warning color, ⚠ = warning emoji
+                    self.console.print(f"[yellow]⚠[/yellow] Server is starting up at {self.config.base_url} (status 503)")
+                else:
+                    print(f"⚠ Server is starting up at {self.config.base_url} (status 503)")
+                return True
+            elif response.status_code == 404:
+                # 404 on /health, try /v1/models as fallback for Ollama/other OpenAI-compatible servers
+                models_response = self.session.get(f"{self.config.base_url}/v1/models")
+                if models_response.status_code == 200:
+                    if self.console:
+                        self.console.print(f"[green]✓[/green] Connected to OpenAI-compatible server at {self.config.base_url}")
+                    else:
+                        print(f"✓ Connected to OpenAI-compatible server at {self.config.base_url}")
+                    return True
+                else:
+                    if self.console:
+                        self.console.print(f"[yellow]⚠[/yellow] Server responded with status {models_response.status_code}")
+                    else:
+                        print(f"⚠ Server responded with status {models_response.status_code}")
+                    return False
+            else:
+                # Other non-success status codes
+                if self.console:
                     self.console.print(f"[yellow]⚠[/yellow] Server responded with status {response.status_code}")
                 else:
                     print(f"⚠ Server responded with status {response.status_code}")
                 return False
 
         except requests.exceptions.RequestException as e:
-            # Network error: Cannot reach server at all
-            # Common causes:
-            # - Server not started
-            # - Wrong host/port
-            # - Firewall blocking connection
-            # - Network issues
             if self.console:
-                # [red] = error color, ❌ = error emoji
                 self.console.print(f"[red]❌[/red] Cannot connect to server: {e}")
-                self.console.print(f"Make sure the vLLM server is running at {self.config.base_url}")
+                self.console.print(f"Make sure the server is running at {self.config.base_url}")
             else:
                 print(f"❌ Cannot connect to server: {e}")
-                print(f"Make sure the vLLM server is running at {self.config.base_url}")
+                print(f"Make sure the server is running at {self.config.base_url}")
             return False
 
     def get_available_models(self) -> List[str]:
