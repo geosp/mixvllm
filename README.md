@@ -458,130 +458,59 @@ You: /mcp
 
 ## Web Terminal
 
-The model server can provide a web-based terminal interface, allowing you to access the CLI tools (like `mixvllm-chat`) directly from your browser. This is perfect for remote access or when you want a convenient way to interact with the server without SSH.
+The web terminal provides browser-based access to CLI tools. You can now run the terminal server **separately** from the model server for better scalability and deployment flexibility.
+
+### Architecture Options
+
+#### Option 1: Combined Server (Original)
+Run both model inference and terminal in one process:
+```bash
+# Start both model server and terminal together
+./launch --model gpt-oss-20b --terminal
+# Model server: http://localhost:8000
+# Terminal: http://localhost:8888
+```
+
+#### Option 2: Separated Servers (New - Recommended)
+Run model server and terminal server as separate processes:
+
+```bash
+# Terminal 1: Start model server
+./launch --model gpt-oss-20b
+
+# Terminal 2: Start terminal server (connects to model server)
+./launch --terminal-only --model-server-url http://localhost:8000
+```
+
+Or using the direct CLI:
+```bash
+# Terminal 1: Model server
+uv run mixvllm-serve --config configs/gpt-oss-20b.yaml
+
+# Terminal 2: Terminal server
+uv run mixvllm-terminal-server --model-server-url http://localhost:8000
+```
 
 ### Features
 
 - **Browser-Based Terminal**: Full xterm.js terminal with colors and proper rendering
 - **Auto-Start Chat**: Automatically launches `mixvllm-chat` connected to your model server
 - **Full Shell Access**: Press Ctrl+C to exit chat and use bash normally
+- **User Home Directory**: Terminal starts in the container user's home directory (`/home/mixvllm`)
 - **Separate Port**: Runs on port 8888 (configurable) independent of model server
-- **Easy Enable**: Just add `-t` or `--enable-terminal` flag when starting the server
+- **Flexible Deployment**: Terminal server can connect to any OpenAI-compatible API
 
-### Quick Start
+### Docker Deployment
 
-**Enable terminal with convenience script (easiest):**
+The Docker setup now supports separated services:
+
 ```bash
-# Start server with web terminal
-./mixvllm-serve --model gpt-oss-20b -t
-
-# Server will show:
-# 🖥️  Web terminal: http://localhost:8888
+cd docker
+docker-compose up -d
+# Starts both model-server and terminal-server containers
 ```
 
-**Using direct command:**
-```bash
-uv run mixvllm-serve --config configs/phi3-mini.yaml --enable-terminal
-```
+### Security Note
 
-**Using config file:**
-```yaml
-# configs/phi3-mini-with-terminal.yaml
-terminal:
-  enabled: true
-  host: "0.0.0.0"
-  port: 8888
-  auto_start_chat: true
-```
-
-Then:
-```bash
-uv run mixvllm-serve --config configs/phi3-mini-with-terminal.yaml
-```
-
-### Usage
-
-1. **Start the server** with terminal enabled:
-   ```bash
-   ./mixvllm-serve --model gpt-oss-20b -t
-   ```
-
-2. **Open your browser** to `http://localhost:8888` (or your server's IP)
-
-3. **Terminal opens automatically** with `mixvllm-chat` running
-
-4. **Chat with the model** right in your browser!
-
-5. **Exit to shell**: Press `Ctrl+C` to return to bash, then:
-   - Run `./mixvllm-chat --enable-mcp` for MCP tools
-   - Run any other bash commands
-   - Type `exit` to close the terminal session
-
-### Configuration Options
-
-**CLI Arguments:**
-```bash
-./mixvllm-serve --model MODEL_NAME \
-  -t                           # Enable terminal (shorthand)
-  --enable-terminal            # Enable terminal (long form)
-  --terminal-port 9000         # Custom port (default: 8888)
-  --terminal-host 127.0.0.1    # Custom host (default: 0.0.0.0)
-  --no-terminal-auto-chat      # Don't auto-start chat
-```
-
-**YAML Configuration:**
-```yaml
-terminal:
-  enabled: true              # Enable web terminal
-  host: "0.0.0.0"           # Listen on all interfaces
-  port: 8888                 # Terminal server port
-  auto_start_chat: true      # Auto-run mixvllm-chat on connect
-```
-
-### Security Considerations
-
-⚠️ **Important Security Notes:**
-
-- The web terminal provides **full shell access** with the same permissions as the server process
-- **No authentication** is enabled by default (anyone who can access the port can use the terminal)
-- Recommended for **development and internal/trusted environments only**
-- Consider using SSH port forwarding for secure remote access:
-  ```bash
-  ssh -L 8888:localhost:8888 user@server
-  ```
-- Future versions may include authentication options
-
-**Recommended Usage:**
-- ✅ Development environments
-- ✅ Internal/trusted networks
-- ✅ Behind VPN or firewall
-- ✅ With SSH port forwarding
-- ❌ Public internet exposure
-- ❌ Production environments without additional security
-
-### Troubleshooting
-
-**Connection Closed Error:**
-- Check server logs for errors
-- Ensure port 8888 is not blocked by firewall
-- Try accessing from `http://localhost:8888` first
-
-**Terminal Won't Start:**
-- Verify dependencies are installed: `uv sync`
-- Check that bash is available: `which bash`
-- Look for errors in server console output
-
-**Can't Access Remotely:**
-- Ensure `--terminal-host 0.0.0.0` (not 127.0.0.1)
-- Check firewall allows port 8888
-- Verify network connectivity to server
-
-### Architecture
-
-The web terminal feature is built with:
-- **terminado**: Jupyter's proven terminal backend (PTY management)
-- **tornado**: Async web server with WebSocket support
-- **xterm.js**: Professional terminal emulator (loaded via CDN)
-- Runs in **separate thread** on **separate port** from model server
-- Properly separated concerns - can be disabled without affecting model serving
+⚠️ **Important**: The web terminal provides **full shell access** with the same permissions as the server process. Only enable in trusted environments - consider adding authentication for production use.
 

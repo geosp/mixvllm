@@ -82,10 +82,13 @@ def create_terminal_app(
     Returns:
         Configured Tornado application
     """
-    # Determine project root (where mixvllm-chat script lives)
+    # Determine working directory for terminal (user's home directory)
     if project_root is None:
-        # Default to the directory containing this package's parent
-        project_root = str(Path(__file__).parent.parent.parent)
+        # Use the user's home directory instead of project root
+        import os
+        terminal_cwd = os.path.expanduser("~")
+    else:
+        terminal_cwd = project_root
 
     # Terminado needs shell_command as a list, not a string
     # We'll use bash and set the working directory via cwd
@@ -100,7 +103,7 @@ def create_terminal_app(
     # Create a custom term manager that sets the working directory
     class CustomTermManager(UniqueTermManager):
         def new_terminal(self, **kwargs):
-            kwargs['cwd'] = project_root
+            kwargs['cwd'] = terminal_cwd
             return super().new_terminal(**kwargs)
 
     # Create terminal manager

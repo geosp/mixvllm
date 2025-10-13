@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  mixvllm-server:
+  model-server:
     image: vllm/vllm-openai:latest
-    container_name: mixvllm-server
+    container_name: mixvllm-model-server
 
     ports:
       - "8000:8000"
@@ -29,5 +29,28 @@ services:
       --tensor-parallel-size 2
       --gpu-memory-utilization 0.85
       --max-num-seqs 32
+
+    restart: unless-stopped
+
+  terminal-server:
+    image: mixvllm:latest
+    container_name: mixvllm-terminal-server
+
+    ports:
+      - "8888:8888"
+
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+
+    user: mixvllm
+
+    depends_on:
+      - model-server
+
+    command: >
+      mixvllm-terminal-server
+      --model-server-url http://model-server:8000
+      --host 0.0.0.0
+      --port 8888
 
     restart: unless-stopped

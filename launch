@@ -16,17 +16,27 @@ fi
 
 # ---- 3. Parse arguments ----------------------------------------
 MODEL=""
+MODEL_SERVER_URL=""
+TERMINAL_ONLY=false
 ARGV=()
 
 while (( $# )); do
   case "$1" in
     -m|--model) shift; MODEL="$1"; shift ;;
+    --terminal-only)
+      TERMINAL_ONLY=true
+      shift
+      ;;
+    --model-server-url) shift; MODEL_SERVER_URL="$1"; shift ;;
     -h|--help)
       cat <<'EOF'
 Usage: launch --model <n> [OPTIONS...]
+       launch --terminal-only --model-server-url <url> [OPTIONS...]
 
 Options:
   -m, --model              Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
+  --terminal-only          Run only the terminal server (requires --model-server-url)
+  --model-server-url URL   URL of external model server for terminal-only mode
   -h, --help               Show this help message
   -t, --terminal           Enable web terminal (shorthand for --enable-terminal)
   --enable-terminal        Enable web terminal for browser-based CLI access
@@ -39,6 +49,9 @@ Any other options are passed through to the underlying mixvllm-serve command.
 Examples:
   # Serve model with web terminal enabled
   ./launch --model phi3-mini --terminal
+
+  # Run only terminal server connecting to external model server
+  ./launch --terminal-only --model-server-url http://localhost:8000
 
   # Custom terminal port
   ./launch --model phi3-mini --terminal --terminal-port 9000
@@ -68,34 +81,49 @@ EOF
 done
 
 # ---- 4. Handle missing model ------------------------------------
-if [[ -z "$MODEL" ]]; then
-  echo "❌  No model specified." >&2
-  echo "You must provide --model <n>." >&2
-
-  # list available models
-  if [[ -d "$CONFIG_DIR" ]]; then
-    echo "❓  Available models:" >&2
-    find "$CONFIG_DIR" -maxdepth 1 -name '*.yaml' 2>/dev/null |
-      while IFS= read -r f; do
-        base="${f##*/}"
-        base="${base%.yaml}"
-        [[ "$base" == "mcp_servers" ]] && continue
-        echo "      • $base" >&2
-      done
-  else
-    echo "⚠️  Config directory '$CONFIG_DIR' does not exist." >&2
+if [[ "$TERMINAL_ONLY" = true ]]; then
+  # Terminal-only mode: require model server URL
+  if [[ -z "$MODEL_SERVER_URL" ]]; then
+    echo "❌  --model-server-url is required when using --terminal-only" >&2
+    exit 1
   fi
-  exit 1
+else
+  # Normal mode: require model
+  if [[ -z "$MODEL" ]]; then
+    echo "❌  No model specified." >&2
+    echo "You must provide --model <n>." >&2
+
+    # list available models
+    if [[ -d "$CONFIG_DIR" ]]; then
+      echo "❓  Available models:" >&2
+      find "$CONFIG_DIR" -maxdepth 1 -name '*.yaml' 2>/dev/null |
+        while IFS= read -r f; do
+          base="${f##*/}"
+          base="${base%.yaml}"
+          [[ "$base" == "mcp_servers" ]] && continue
+          echo "      • $base" >&2
+        done
+    else
+      echo "⚠️  Config directory '$CONFIG_DIR' does not exist." >&2
+    fi
+    exit 1
+  fi
 fi
 
-# ---- 5. Resolve config file ------------------------------------
-CONFIG="$CONFIG_DIR/${MODEL}.yaml"
+# ---- 5. Execute ---------------------------------------------
+if [[ "$TERMINAL_ONLY" = true ]]; then
+  # Terminal-only mode: start standalone terminal server
+  echo "🚀  Launching terminal server connecting to $MODEL_SERVER_URL"
+  exec uv run mixvllm-terminal-server --model-server-url "$MODEL_SERVER_URL" "${ARGV[@]}"
+else
+  # Normal mode: start model server with optional terminal
+  CONFIG="$CONFIG_DIR/${MODEL}.yaml"
 
-if [[ ! -f "$CONFIG" ]]; then
-  echo "❌  No config file found for model '$MODEL' (expected '$CONFIG')" >&2
-  exit 1
+  if [[ ! -f "$CONFIG" ]]; then
+    echo "❌  No config file found for model '$MODEL' (expected '$CONFIG')" >&2
+    exit 1
+  fi
+
+  echo "🚀  Launching mixvllm-serve with model '$MODEL' → $CONFIG"
+  exec uv run mixvllm-serve --config "$CONFIG" "${ARGV[@]}"
 fi
-
-# ---- 6. Execute ---------------------------------------------
-echo "🚀  Launching mixvllm-serve with model '$MODEL' → $CONFIG"
-uv run mixvllm-serve --config "$CONFIG" "${ARGV[@]}"
