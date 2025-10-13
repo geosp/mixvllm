@@ -59,6 +59,7 @@ RUN cd /app/mixvllm && . .venv/bin/activate && \
         rich \
         pydantic \
         openai \
+        requests \
         && \
     uv pip install -e . --no-deps
 
