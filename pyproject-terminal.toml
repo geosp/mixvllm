@@ -8,6 +8,7 @@ dependencies = [
     "terminado>=0.18.0",
     "pydantic>=2.0.0",
     "openai>=2.2.0",
+    "prompt_toolkit>=3.0.0",
 ]
 
 [build-system]

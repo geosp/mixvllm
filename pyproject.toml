@@ -34,7 +34,7 @@ dev = [
 
 [project.scripts]
 mixvllm-serve = "mixvllm.cli.serve_model:main"
-mixvllm-chat = "standalone.chat.chat_client_standalone:main"
+mixvllm-chat = "standalone.chat.client.cli:main"
 mixvllm-terminal-server = "standalone.terminal.terminal_server_standalone:main"
 
 [build-system]
