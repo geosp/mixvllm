@@ -41,7 +41,7 @@ ENV PATH=/app/mixvllm/.venv/bin:/home/mixvllm/.local/bin:${PATH}
 ENV VIRTUAL_ENV=/app/mixvllm/.venv
 
 # Copy the local repository contents into the container
-COPY --chown=mixvllm:mixvllm . /app/mixvllm/
+COPY --chown=mixvllm:mixvllm mixvllm/. /app/mixvllm/
 
 # Copy pyproject.toml to the mixvllm directory for installation
 COPY --chown=mixvllm:mixvllm pyproject.toml /app/mixvllm/pyproject.toml

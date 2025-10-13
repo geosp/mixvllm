@@ -42,7 +42,6 @@ services:
 
     volumes:
       - /home/geo/develop/mixvllm/configs:/app/mixvllm/configs
-      - ../standalone:/app/mixvllm/standalone
 
     environment:
       - HF_TOKEN=${HF_TOKEN}
