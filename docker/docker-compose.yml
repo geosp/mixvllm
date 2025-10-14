@@ -34,7 +34,8 @@ services:
     # build:
     #   context: ../mixvllm-chat
     #   dockerfile: Dockerfile.terminal
-    image: mixvllm-terminal
+    # image: mixvllm-terminal
+    image: ghcr.io/geosp/mixvllm:main
     container_name: terminal-server
 
     ports:
