@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#!/usr/bin/env bash
 # ------------------------------------------------------------
 # launch – wrapper that pulls the right YAML from the configs/ #
 # directory and forwards everything to the mixvllm-serve cmd  #
@@ -6,7 +7,7 @@
 set -euo pipefail
 
 # ---- 1. Default config directory --------------------------------
-CONFIG_DIR=${CONFIG_DIR:-configs}
+CONFIG_DIR=${CONFIG_DIR:-config}
 
 # ---- 2. Make sure HF_TOKEN is exported -------------------------
 if [[ -z "${HF_TOKEN:-}" ]]; then
@@ -35,46 +36,19 @@ Usage: launch --model <n> [OPTIONS...]
 
 Options:
   -m, --model              Name of the model (corresponds to a YAML file in "$CONFIG_DIR")
-  --terminal-only          Run only the terminal server (requires --model-server-url)
-  --model-server-url URL   URL of external model server for terminal-only mode
+  --terminal-only          (deprecated) Run only the terminal server (no longer supported)
+  --model-server-url URL   (deprecated) URL of external model server for terminal-only mode
   -h, --help               Show this help message
-  -t, --terminal           Enable web terminal (shorthand for --enable-terminal)
-  --enable-terminal        Enable web terminal for browser-based CLI access
-  --terminal-port PORT     Web terminal server port (default: 8888)
-  --terminal-host HOST     Web terminal server host (default: 0.0.0.0)
-  --no-terminal-auto-chat  Disable auto-starting chat in web terminal
-
 Any other options are passed through to the underlying mixvllm-serve command.
 
 Examples:
-  # Serve model with web terminal enabled
-  ./launch --model phi3-mini --terminal
+  # Serve model
+  ./launch --model gpt-oss-20b
 
-  # Run only terminal server connecting to external model server
-  ./launch --terminal-only --model-server-url http://localhost:8000
-
-  # Custom terminal port
-  ./launch --model phi3-mini --terminal --terminal-port 9000
-
-  # Terminal without auto-starting chat
-  ./launch --model phi3-mini --terminal --no-terminal-auto-chat
 EOF
       exit 0
       ;;
-    -t|--terminal)
-      ARGV+=("--enable-terminal")
-      shift
-      ;;
-    --enable-terminal|--terminal-port|--terminal-host|--no-terminal-auto-chat)
-      # Terminal-related flags: pass through as-is
-      if [[ "$1" == "--terminal-port" || "$1" == "--terminal-host" ]]; then
-        ARGV+=("$1" "$2")
-        shift 2
-      else
-        ARGV+=("$1")
-        shift
-      fi
-      ;;
+    # Remove web terminal options (no longer supported)
     --) shift; ARGV+=("$@"); break ;;
     *) ARGV+=("$1"); shift ;;
   esac
@@ -111,19 +85,12 @@ else
 fi
 
 # ---- 5. Execute ---------------------------------------------
-if [[ "$TERMINAL_ONLY" = true ]]; then
-  # Terminal-only mode: start standalone terminal server
-  echo "🚀  Launching terminal server connecting to $MODEL_SERVER_URL"
-  exec uv run mixvllm-terminal-server --model-server-url "$MODEL_SERVER_URL" "${ARGV[@]}"
-else
-  # Normal mode: start model server with optional terminal
-  CONFIG="$CONFIG_DIR/${MODEL}.yaml"
+CONFIG="$CONFIG_DIR/${MODEL}.yaml"
 
   if [[ ! -f "$CONFIG" ]]; then
-    echo "❌  No config file found for model '$MODEL' (expected '$CONFIG')" >&2
+    echo "❌  No config file found for model '$MODEL' (expected '$CONFIG') in directory '$CONFIG_DIR'" >&2
     exit 1
   fi
 
-  echo "🚀  Launching mixvllm-serve with model '$MODEL' → $CONFIG"
-  exec uv run mixvllm-serve --config "$CONFIG" "${ARGV[@]}"
-fi
+echo "🚀  Launching mixvllm-serve with model '$MODEL' → $CONFIG"
+exec uv run mixvllm-serve --config "$CONFIG" "${ARGV[@]}"

@@ -31,8 +31,6 @@ dev = [
 [project.scripts]
 mixvllm-serve = "mixvllm_server.cli.serve_model:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src.cli", "src.config", "src.inference"]
 
 [tool.ruff]
 line-length = 100
@@ -57,3 +55,6 @@ dev = [
     "huggingface-hub[cli]>=0.35.3",
     "pytest-cov>=7.0.0",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mixvllm_server"]

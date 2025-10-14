@@ -398,11 +398,22 @@ Install additional dependencies for MCP support:
 uv sync
 ```
 
-### Usage
+## Usage
 
-**Note**: Since vLLM serves only one model at a time, the `--model` parameter is optional. The client will automatically detect and use the model currently loaded on the server.
+### Running the gpt-oss-20b Model
 
-#### Simple Chat Mode (Default)
+To run the `gpt-oss-20b` model using your configuration file, use the following command from the `mixvllm_server` directory:
+
+```bash
+HF_TOKEN=<your_huggingface_token> uv run mixvllm-serve --config src/config/gpt-oss-20b.yaml
+```
+
+**Notes:**
+- Replace `<your_huggingface_token>` with your actual Hugging Face access token.
+- This command will use all settings from `src/config/gpt-oss-20b.yaml`, including model name, tensor parallelism, GPU memory, and dtype.
+- Make sure your environment has access to the required GPUs and the Hugging Face repository.
+- If you encounter quantization or dtype errors, ensure your config file sets `dtype: bfloat16` as shown in the example config.
+
 
 ```bash
 # Basic chat with vLLM server (auto-detects model)
