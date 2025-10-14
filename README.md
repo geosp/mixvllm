@@ -32,37 +32,71 @@ uv run python script.py
 source .venv/bin/activate
 ```
 
+
 ## Project Structure
 
 ```
 .
-├── create_project.sh     # Project bootstrap script
-├── mixvllm/              # Main package
-│   ├── cli/              # Model serving CLI
-│   │   ├── serve_model.py
-│   │   └── README.md
-│   ├── client/           # Chat client
+├── install.sh
+├── installation_guide.md
+├── launch
+├── README.md
+├── configs/
+│   ├── example_model.yaml
+│   ├── llama-70b-tp2.yaml
+│   ├── llama-7b.yaml
+│   ├── mcp_servers.yaml
+│   └── phi3-mini-with-terminal.yaml
+├── docker/
+│   ├── docker-compose.yml
+│   ├── entrypoint.sh
+│   └── README.md
+├── mixvllm_server/
+│   ├── pyproject.toml
+│   ├── README.md
+│   └── src/
+│       ├── cli/
+│       │   ├── serve_model.py
+│       │   └── README.md
+│       ├── config/
+│       │   ├── gpt-oss-20b.yaml
+│       │   └── phi3-mini.yaml
+│       ├── inference/
+│       │   ├── config.py
+│       │   ├── server.py
+│       │   ├── utils.py
+│       │   ├── terminal_server.py
+│       │   └── README.md
+├── mixvllm-chat/
+│   ├── Dockerfile.terminal
+│   ├── pyproject.toml
+│   ├── README.md
+│   ├── app/
 │   │   ├── chat_client.py
-│   │   ├── chat_engine.py
-│   │   ├── cli.py
-│   │   ├── config.py
-│   │   ├── connection_manager.py
-│   │   ├── history_manager.py
-│   │   ├── response_handler.py
-│   │   ├── tool_manager.py
-│   │   ├── ui_manager.py
-│   │   ├── utils/         # MCP tools and utilities
-│   │   └── README.md
-│   └── inference/        # vLLM inference wrappers
-│       ├── config.py
-│       ├── server.py
-│       └── utils.py
-├── configs/              # Model and server configurations
-├── tests/                # Test suite
-└── .claude/              # Temporary and experimental code
-    ├── experiments/      # Model testing and prototyping
-    ├── benchmarks/       # Performance benchmarks
-    └── scratch/          # Quick tests and scratchpad
+│   │   ├── client/
+│   │   │   ├── chat_client.py
+│   │   │   ├── chat_engine.py
+│   │   │   ├── cli.py
+│   │   │   ├── config.py
+│   │   │   ├── connection_manager.py
+│   │   │   ├── history_manager.py
+│   │   │   ├── response_handler.py
+│   │   │   ├── tool_manager.py
+│   │   │   ├── ui_manager.py
+│   │   │   └── utils/
+│   │   │       ├── mcp_client.py
+│   │   │       └── mcp_tools.py
+│   │   ├── config/
+│   │   │   └── mcp_servers.yaml
+│   │   └── utils/
+│   │       ├── mcp_client.py
+│   │       └── mcp_tools.py
+│   ├── terminal/
+│   │   └── terminal_server_standalone.py
+├── tests/
+│   ├── __init__.py
+│   ├── tensor_parallel.py
+│   └── test_mcp.py
 ```
 
 ## Quick Start
@@ -456,61 +490,47 @@ You: /mcp
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
 
+
 ## Web Terminal
 
-The web terminal provides browser-based access to CLI tools. You can now run the terminal server **separately** from the model server for better scalability and deployment flexibility.
+The web terminal provides browser-based access to CLI tools and is now designed to run as a separate process from the model server. This separation allows for more flexible deployment, improved scalability, and independent management of terminal and model services.
 
-### Architecture Options
+### Architecture
 
-#### Option 1: Combined Server (Original)
-Run both model inference and terminal in one process:
+- **Model Server**: Serves the vLLM API (OpenAI-compatible) on a configurable port (default: 8000).
+- **Terminal Server**: Runs independently, connects to any model server via HTTP, and provides a full-featured shell and chat interface in the browser (default port: 8888).
+
+### Usage
+
+**Start the model server:**
 ```bash
-# Start both model server and terminal together
-./launch --model gpt-oss-20b --terminal
-# Model server: http://localhost:8000
-# Terminal: http://localhost:8888
-```
-
-#### Option 2: Separated Servers (New - Recommended)
-Run model server and terminal server as separate processes:
-
-```bash
-# Terminal 1: Start model server
-./launch --model gpt-oss-20b
-
-# Terminal 2: Start terminal server (connects to model server)
-./launch --terminal-only --model-server-url http://localhost:8000
-```
-
-Or using the direct CLI:
-```bash
-# Terminal 1: Model server
 uv run mixvllm-serve --config configs/gpt-oss-20b.yaml
+# or use any supported config/model options
+```
 
-# Terminal 2: Terminal server
+**Start the terminal server (in a separate process):**
+```bash
 uv run mixvllm-terminal-server --model-server-url http://localhost:8000
+# or use --port to change the terminal port
 ```
 
 ### Features
 
-- **Browser-Based Terminal**: Full xterm.js terminal with colors and proper rendering
-- **Auto-Start Chat**: Automatically launches `mixvllm-chat` connected to your model server
-- **Full Shell Access**: Press Ctrl+C to exit chat and use bash normally
-- **User Home Directory**: Terminal starts in the container user's home directory (`/home/mixvllm`)
-- **Separate Port**: Runs on port 8888 (configurable) independent of model server
-- **Flexible Deployment**: Terminal server can connect to any OpenAI-compatible API
+- **Browser-Based Terminal**: xterm.js frontend with full shell access
+- **Auto-Start Chat**: Optionally launches `mixvllm-chat` connected to your model server
+- **Flexible Connection**: Terminal server can connect to any OpenAI-compatible API endpoint
+- **Separate Ports**: Terminal and model server run on independent ports for easier scaling and security
+- **Docker Support**: Docker Compose can launch both services as separate containers
 
 ### Docker Deployment
-
-The Docker setup now supports separated services:
 
 ```bash
 cd docker
 docker-compose up -d
-# Starts both model-server and terminal-server containers
+# Starts both model-server and terminal-server containers independently
 ```
 
 ### Security Note
 
-⚠️ **Important**: The web terminal provides **full shell access** with the same permissions as the server process. Only enable in trusted environments - consider adding authentication for production use.
+The web terminal provides full shell access with the same permissions as the server process. Only enable in trusted environments. For production, consider network restrictions or authentication.
 
