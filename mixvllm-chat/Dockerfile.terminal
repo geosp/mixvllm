@@ -1,0 +1,71 @@
+# Minimal Terminal Server Image
+# Lightweight container for running the MixVLLM web terminal server
+# No GPU dependencies, CUDA, or vLLM - just the terminal interface
+
+FROM python:3.11-slim
+
+LABEL maintainer="Geovanny Fajardo <gffajardo@gmail.com>"
+LABEL description="MixVLLM Terminal Server - Lightweight web terminal interface"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install minimal system dependencies for terminal server
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    build-essential \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (Universal Python package manager)
+RUN pip install --no-cache-dir uv
+
+# Create a non-root user with sudo privileges
+RUN groupadd --gid 1000 mixvllm && \
+    useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash mixvllm && \
+    echo "mixvllm ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/mixvllm && \
+    chmod 0440 /etc/sudoers.d/mixvllm
+
+# Create app directories and set ownership
+RUN mkdir -p /app/mixvllm/mixvllm-chat && chown -R mixvllm:mixvllm /app
+
+# Switch to non-root user
+USER mixvllm
+
+# Set working directory
+WORKDIR /app/mixvllm/mixvllm-chat
+
+# Copy the current directory (mixvllm-chat) to the container
+COPY --chown=mixvllm:mixvllm . /app/mixvllm/mixvllm-chat
+
+# Create virtual environment and install dependencies
+# uv will create .venv in the project directory (/app/mixvllm/mixvllm-chat/.venv)
+RUN uv sync && \
+    echo "✅ Dependencies installed successfully"
+
+# Set environment variables to use the venv created by uv
+ENV PATH=/app/mixvllm/mixvllm-chat/:/app/mixvllm/mixvllm-chat/.venv/bin:/home/mixvllm/.local/bin:${PATH}
+ENV VIRTUAL_ENV=/app/mixvllm/mixvllm-chat/.venv
+
+# Make convenience scripts executable
+RUN chmod +x /app/mixvllm/mixvllm-chat/chat
+
+# Add /app/mixvllm/mixvllm-chat to PATH
+ENV PATH=/app/mixvllm/mixvllm-chat:${PATH}
+
+# Append the required PATH to the .bashrc file for the mixvllm user
+RUN echo "export PATH=/app/mixvllm/mixvllm-chat:/app/mixvllm/mixvllm-chat/.venv/bin:$PATH" >> /home/mixvllm/.bashrc
+
+# Expose terminal server port
+EXPOSE 8888
+
+# Set default model server URL (can be overridden at runtime)
+ENV MODEL_SERVER_URL=http://localhost:8000
+
+# Verify installation
+RUN uv run python -c "import tornado, terminado; print('✅ Terminal dependencies verified')"
+
+# Start the terminal server
+# Users can override MODEL_SERVER_URL with: docker run -e MODEL_SERVER_URL=http://host:port ...
+CMD ["sh", "-c", "uv run python terminal/terminal_server_standalone.py --model-server-url ${MODEL_SERVER_URL} --host 0.0.0.0 --port 8888"]

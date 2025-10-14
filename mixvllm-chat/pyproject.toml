@@ -1,0 +1,31 @@
+[project]
+name = "mixvllm-chat"
+version = "0.1.0"
+description = "MixVLLM Chat App"
+requires-python = ">=3.11"
+dependencies = [
+    "tornado>=6.4.0",
+    "terminado>=0.18.0",
+    "pydantic>=2.0.0",
+    "openai>=2.2.0",
+    "prompt_toolkit>=3.0.0",
+    "rich>=13.0.0",
+    "requests>=2.25.0",
+    "pyyaml>=6.0.0"
+]
+
+[project.scripts]
+mixvllm-chat = "app.chat_client:main"
+
+# Tell uv we are not building or packaging anything
+[tool.uv]
+managed = true
+no-build = false
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app"]
+exclude = ["terminal"]

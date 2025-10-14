@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from mixvllm.utils.mcp_client import get_mcp_config
-from mixvllm.utils.mcp_tools import get_mcp_servers, get_mcp_tool_names, test_mcp_connection
+from mixvllm.app.client.utils.mcp_tools import get_mcp_servers, get_mcp_tool_names, test_mcp_connection
 
 def test_mcp_config():
     """Test MCP configuration loading."""
