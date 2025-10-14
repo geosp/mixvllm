@@ -36,8 +36,8 @@ USER mixvllm
 # Set working directory
 WORKDIR /app/mixvllm/mixvllm-chat
 
-# Copy the current directory (mixvllm-chat) to the container
-COPY --chown=mixvllm:mixvllm . /app/mixvllm/mixvllm-chat
+# Copy only the mixvllm-chat directory to the container
+COPY --chown=mixvllm:mixvllm mixvllm-chat/ /app/mixvllm/mixvllm-chat
 
 # Create virtual environment and install dependencies
 # uv will create .venv in the project directory (/app/mixvllm/mixvllm-chat/.venv)
