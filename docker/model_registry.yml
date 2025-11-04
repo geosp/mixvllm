@@ -1,7 +1,7 @@
 models:
   gpt-oss-20b:
     model: openai/gpt-oss-20b
-    dtype: float16
+    dtype: bfloat16
     tensor_parallel_size: 2
     gpu_memory_utilization: 0.35
     max_num_seqs: 8
@@ -9,7 +9,7 @@ models:
 
   gpt-oss-120b:
     model: openai/gpt-oss-120b 
-    dtype: float16
+    dtype: bfloat16
     tensor_parallel_size: 2
     gpu_memory_utilization: 0.55
     max_num_seqs: 8

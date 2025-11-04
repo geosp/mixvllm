@@ -106,6 +106,8 @@ services:
       - /dev/infiniband/rdma_cm
       - /dev/infiniband/uverbs0
     volumes:
+      - ../launch_model.sh:/opt/vllm/launch_model.sh:ro
+      - ../model_registry.yml:/opt/vllm/model_registry.yml:ro
       - ${HF_HOME}:/root/.cache/huggingface 
       - ${HARMONY_ENCODINGS}:/etc/encodings/:ro 
       - /tmp/ray:/tmp/ray
@@ -128,4 +130,4 @@ services:
               capabilities: [gpu]
     depends_on:
       - ray-node
-    command: ["/bin/bash", "../launch_model.sh"]
+    command: ["/opt/vllm/launch_model.sh", "${MODEL_NAME}"]
