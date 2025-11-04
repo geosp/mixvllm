@@ -1,12 +1,25 @@
 # vLLM Development Environment
 
-Development environment for vLLM with dual-GPU tensor parallelism support.
+Development environment for vLLM supporting both single-machine tensor parallelism and distributed inference across multiple nodes.
 
-## Hardware
+## Deployment Options
 
+### 1. Single Machine Setup
 - **GPUs**: 2x NVIDIA GeForce RTX 3090 Ti (24GB VRAM each)
 - **CUDA Version**: 12.8
 - **Driver**: 570.172.08
+
+### 2. Distributed Cluster Setup
+- **Network**: RDMA over Converged Ethernet (RoCE)
+- **Bandwidth**: Up to 12 GB/s inter-node communication
+- **Requirements**: 
+  - RDMA-capable NICs (e.g., Mellanox ConnectX)
+  - GPUDirect RDMA support
+  - High-bandwidth interconnect
+
+For detailed distributed setup information, see:
+- [Docker Configuration Guide](docker/README.md)
+- [RDMA Cluster Setup](multi_node_gpu_cluster_with_rdma/setup.md)
 
 ## Setup
 
@@ -37,17 +50,39 @@ source .venv/bin/activate
 
 ```
 .
-├── install.sh
-├── installation_guide.md
-├── launch
-├── README.md
-├── configs/
-│   ├── example_model.yaml
-│   ├── llama-70b-tp2.yaml
-│   ├── llama-7b.yaml
-│   ├── mcp_servers.yaml
-│   └── phi3-mini-with-terminal.yaml
-├── docker/
+├── configs/                           # Configuration files
+│   ├── example_model.yaml            # Template configuration
+│   ├── llama-70b-tp2.yaml           # Tensor parallel config for Llama 70B
+│   ├── llama-7b.yaml                # Single GPU config for Llama 7B
+│   ├── mcp_servers.yaml             # MCP servers configuration
+│   └── phi3-mini-with-terminal.yaml # Configuration for Phi-3 model
+├── docker/                          # Docker deployment configurations
+│   ├── head/                        # Ray head node setup
+│   │   ├── docker-compose.yml       # Head node container config
+│   │   ├── .env.example            # Environment template for head
+│   │   └── README.md               # Head node documentation
+│   ├── stand_alone/                 # Single node deployment
+│   │   └── docker-compose.yml       # Standalone container config
+│   └── worker/                      # Ray worker node setup
+│       ├── docker-compose.yml       # Worker node container config
+│       ├── .env.exmple             # Environment template for worker
+│       └── README.md               # Worker node documentation
+├── mixvllm_server/                  # Core server implementation
+│   ├── src/                        # Source code
+│   │   ├── cli/                    # Command-line interface
+│   │   ├── config/                 # Server configuration
+│   │   └── inference/              # Inference implementation
+│   └── README.md                   # Server documentation
+├── mixvllm-chat/                    # Chat interface implementation
+│   ├── app/                        # Application code
+│   │   ├── client/                 # Chat client implementation
+│   │   └── utils/                  # Utility functions
+│   └── terminal/                   # Terminal server implementation
+├── multi_node_gpu_cluster_with_rdma/ # RDMA cluster setup guides
+│   └── setup.md                    # Detailed RDMA configuration
+└── tests/                          # Test suite
+    ├── tensor_parallel.py          # Tensor parallelism tests
+    └── test_mcp.py                # MCP integration tests
 │   ├── docker-compose.yml
 │   ├── entrypoint.sh
 │   └── README.md
@@ -502,7 +537,66 @@ You: /mcp
 ```
 
 
-## Web Terminal
+## Distributed Architecture
+
+## Overview
+The system supports both standalone and distributed deployment modes, leveraging Ray for cluster management and RDMA for high-performance communication.
+
+```mermaid
+graph TB
+    subgraph "MixVLLM Architecture"
+        Client(["Client"])
+        
+        subgraph "Head Node"
+            HS["HTTP Server"]
+            RC["Ray Controller"]
+            MS1["Model Shard 1"]
+        end
+        
+        subgraph "Worker Node"
+            RW["Ray Worker"]
+            MS2["Model Shard 2"]
+        end
+        
+        Client -->|"HTTP/REST"| HS
+        HS --> RC
+        RC <-->|"RDMA/Ray"| RW
+        RC --> MS1
+        RW --> MS2
+        
+        MS1 <-->|"NCCL (12GB/s)"| MS2
+    end
+```
+
+## Deployment Options
+
+### 1. Standalone Mode
+For single-node deployment:
+```bash
+cd docker/stand_alone
+docker-compose up -d
+```
+
+### 2. Distributed Mode
+Head Node:
+```bash
+cd docker/head
+cp .env.example .env
+# Configure environment
+docker-compose up -d
+```
+
+Worker Node:
+```bash
+cd docker/worker
+cp .env.exmple .env
+# Configure environment
+docker-compose up -d
+```
+
+For detailed configuration, see [Docker Configuration Guide](docker/README.md).
+
+# Web Terminal
 
 The web terminal provides browser-based access to CLI tools and is now designed to run as a separate process from the model server. This separation allows for more flexible deployment, improved scalability, and independent management of terminal and model services.
 
