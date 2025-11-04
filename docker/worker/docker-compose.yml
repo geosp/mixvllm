@@ -1,0 +1,104 @@
+services:
+  ray-node:
+    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:25.09-py3
+    container_name: ray-${RAY_MODE}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    runtime: nvidia
+    env_file:
+      - ./.env
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      # GPU visibility
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+      # NCCL / RDMA
+      - NCCL_IB_DISABLE=${NCCL_IB_DISABLE}
+      - NCCL_IB_HCA=${NCCL_IB_HCA}
+      - NCCL_IB_GID_INDEX=${NCCL_IB_GID_INDEX}
+      - NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME}
+      - NCCL_CROSS_NIC=${NCCL_CROSS_NIC}
+      - NCCL_DEBUG=${NCCL_DEBUG}
+      - NCCL_DEBUG_SUBSYS=${NCCL_DEBUG_SUBSYS}
+      - NCCL_NET_GDR_LEVEL=${NCCL_NET_GDR_LEVEL}
+      - NCCL_NET_PLUGIN=/opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
+      - NCCL_IB_TC=106
+      - NCCL_IB_SL=3
+      - NCCL_IB_TIMEOUT=23
+      - NCCL_IB_RETRY_CNT=7
+
+      # Ensure Ray workers inherit NCCL envs for RoCE
+      - VLLM_RAY_WORKER_ENV_VARS=NCCL_IB_DISABLE,NCCL_IB_HCA,NCCL_IB_GID_INDEX,NCCL_SOCKET_IFNAME,NCCL_CROSS_NIC,NCCL_DEBUG,NCCL_DEBUG_SUBSYS,NCCL_NET_GDR_LEVEL,NCCL_NET_PLUGIN,NCCL_IB_TC,NCCL_IB_SL,NCCL_IB_TIMEOUT,NCCL_IB_RETRY_CNT
+
+      # Ray niceties
+      - RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1
+      - RAY_DISABLE_DOCKER_CPU_WARNING=1
+
+      # Ray cluster address comes from .env: RAY_ADDRESS=192.168.100.1:6379
+      - RAY_ADDRESS=${RAY_ADDRESS}
+
+    # RDMA device + sysfs visibility inside the container
+    devices:
+      - /dev/infiniband/rdma_cm
+      - /dev/infiniband/uverbs0
+      - /dev/infiniband:/dev/infiniband
+    volumes:
+      - ${HF_HOME}:/root/.cache/huggingface
+      - ${HARMONY_ENCODINGS}:/etc/encodings/:ro
+      - /tmp/ray:/tmp/ray
+      - /sys/class/infiniband:/sys/class/infiniband:ro
+      - /sys/class/net:/sys/class/net:ro
+      - /etc/rdma:/etc/rdma:ro
+
+    security_opt:
+      - apparmor:unconfined
+
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    cap_add:
+      - IPC_LOCK
+      - SYS_NICE
+      - SYS_RESOURCE
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    command: >
+      bash -c '
+        echo "=================================";
+        echo "Ray WORKER Node Starting";
+        echo "=================================";
+        echo "Node IP: ${VLLM_HOST_IP}";
+        echo "Head Address: ${RAY_ADDRESS}";
+        echo "NCCL_IB_HCA: ${NCCL_IB_HCA}";
+        echo "NCCL_SOCKET_IFNAME: ${NCCL_SOCKET_IFNAME}";
+        echo "GPU Check:"; nvidia-smi -L || echo "No GPU access!";
+        echo "RDMA Check:"; ls -l /dev/infiniband || true; rdma link show || true;
+        echo "=================================";
+
+        ray stop --force 2>/dev/null || true; sleep 2;
+
+        echo "⏳ Waiting for head node..."; sleep 15;
+
+        echo "🌐 Joining Ray cluster...";
+        ray start \
+          --address=${RAY_ADDRESS} \
+          --node-ip-address=${VLLM_HOST_IP} \
+          --num-gpus=1 \
+          --verbose;
+
+        echo "✅ Ray WORKER joined cluster";
+
+        # Keep container alive and stream raylet logs if available
+        tail -f /tmp/ray/session_latest/logs/raylet.out 2>/dev/null || \
+        while true; do sleep 30; echo "Worker active..."; done;
+      '

@@ -1,0 +1,168 @@
+services:
+  ray-node:
+    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:25.09-py3
+    container_name: ray-${RAY_MODE}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    runtime: nvidia
+    env_file:
+      - ./.env
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES}
+      - NCCL_IB_DISABLE=${NCCL_IB_DISABLE}
+      - NCCL_IB_HCA=${NCCL_IB_HCA}
+      - NCCL_IB_GID_INDEX=${NCCL_IB_GID_INDEX}
+      - NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME}
+      - NCCL_CROSS_NIC=${NCCL_CROSS_NIC}
+      - NCCL_DEBUG=${NCCL_DEBUG}
+      - NCCL_DEBUG_SUBSYS=${NCCL_DEBUG_SUBSYS}
+      - NCCL_NET_GDR_LEVEL=${NCCL_NET_GDR_LEVEL}
+      - VLLM_RAY_WORKER_ENV_VARS=NCCL_IB_DISABLE,NCCL_IB_HCA,NCCL_IB_GID_INDEX,NCCL_SOCKET_IFNAME,NCCL_CROSS_NIC,NCCL_DEBUG,NCCL_DEBUG_SUBSYS,NCCL_NET_GDR_LEVEL,NCCL_NET_PLUGIN,NCCL_IB_TC,NCCL_IB_SL,NCCL_IB_TIMEOUT,NCCL_IB_RETRY_CNT
+      - RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1
+      - RAY_DISABLE_DOCKER_CPU_WARNING=1
+      - HF_HOME=/root/.cache/huggingface
+    devices:
+      - /dev/infiniband/rdma_cm
+      - /dev/infiniband/uverbs0
+      - /dev/infiniband:/dev/infiniband
+    volumes:
+      - ${HF_HOME}:/root/.cache/huggingface
+      - ${HARMONY_ENCODINGS}:/etc/encodings/:ro 
+      - /tmp/ray:/tmp/ray
+      - /sys/class/infiniband:/sys/class/infiniband:ro
+      - /sys/class/net:/sys/class/net:ro
+      - /etc/rdma:/etc/rdma:ro
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    cap_add:
+      - IPC_LOCK
+      - SYS_NICE
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: |
+      bash -c '
+        echo "=================================";
+        echo "Ray HEAD Node Starting";
+        echo "=================================";
+        echo "Node IP: ${VLLM_HOST_IP}";
+        echo "GPU Check:"; nvidia-smi -L || echo "No GPU access!";
+        echo "RDMA Check:"; ls -l /dev/infiniband || true; rdma link show || true;
+        echo "=================================";
+
+        ray stop --force 2>/dev/null || true; sleep 2;
+
+        echo "🚀 Starting Ray HEAD node...";
+        ray start --head \
+          --node-ip-address=${VLLM_HOST_IP} \
+          --port=6379 \
+          --dashboard-host=0.0.0.0 \
+          --dashboard-port=8265 \
+          --num-gpus=1 \
+          --verbose;
+
+        echo "✅ Ray HEAD started";
+        echo "📊 Dashboard: http://${VLLM_HOST_IP}:8265";
+
+        while true; do
+          sleep 30; echo "=== Ray Status ==="; ray status 2>/dev/null || true;
+        done;
+      '
+
+  vllm:
+    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:25.09-py3
+    container_name: vllm-server
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    runtime: nvidia
+    env_file:
+      - ./.env
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - NCCL_IB_DISABLE=${NCCL_IB_DISABLE}
+      - NCCL_IB_HCA=${NCCL_IB_HCA}
+      - NCCL_IB_GID_INDEX=${NCCL_IB_GID_INDEX}
+      - NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME}
+      - NCCL_CROSS_NIC=${NCCL_CROSS_NIC}
+      - NCCL_DEBUG=${NCCL_DEBUG}
+      - NCCL_DEBUG_SUBSYS=${NCCL_DEBUG_SUBSYS}
+      - NCCL_NET_GDR_LEVEL=${NCCL_NET_GDR_LEVEL}
+      - VLLM_RAY_WORKER_ENV_VARS=NCCL_IB_DISABLE,NCCL_IB_HCA,NCCL_IB_GID_INDEX,NCCL_SOCKET_IFNAME,NCCL_CROSS_NIC,NCCL_DEBUG,NCCL_DEBUG_SUBSYS,NCCL_NET_GDR_LEVEL
+      - RAY_ADDRESS=${VLLM_HOST_IP}:6379
+      - VLLM_LOGGING_LEVEL=INFO
+    devices:
+      - /dev/infiniband/rdma_cm
+      - /dev/infiniband/uverbs0
+    volumes:
+      - ${HF_HOME}:/root/.cache/huggingface 
+      - ${HARMONY_ENCODINGS}:/etc/encodings/:ro 
+      - /tmp/ray:/tmp/ray
+      - /sys/class/infiniband:/sys/class/infiniband:ro
+      - /sys/class/net:/sys/class/net:ro
+      - /etc/rdma:/etc/rdma:ro
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    cap_add:
+      - IPC_LOCK
+      - SYS_NICE
+      - SYS_RESOURCE
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    depends_on:
+      - ray-node
+    command: |
+      bash -c '
+        echo "=================================";
+        echo "vLLM Server Configuration";
+        echo "=================================";
+
+        echo "GPU Check:"; nvidia-smi -L || echo "ERROR: No GPU access!";
+        echo "CUDA Check:"; python -c "import torch; print(\"CUDA available:\", torch.cuda.is_available()); print(\"GPU count:\", torch.cuda.device_count())";
+        echo "RDMA Check:"; ls -l /dev/infiniband || true; rdma link show || true;
+
+        echo "Waiting for Ray cluster to form..."; sleep 20;
+        echo "Checking Ray cluster:"; ray status || true;
+
+        echo "";
+        echo "Configuration:";
+        echo "  Model: openai/gpt-oss-20b";
+        echo "  Tensor Parallel: ${WORLD_SIZE}";
+        echo "  GPU Memory: ${GPU_MEMORY_UTILIZATION}";
+        echo "  Max Seqs: ${MAX_NUM_SEQS}";
+        echo "  Ray Address: ${VLLM_HOST_IP}:6379";
+        echo "=================================";
+
+        echo "🚀 Starting vLLM with Ray backend...";
+
+        export RAY_ADDRESS=${VLLM_HOST_IP}:6379;
+
+        #tail -f /dev/null
+        python -m vllm.entrypoints.openai.api_server \
+          --host 0.0.0.0 \
+          --port ${MASTER_PORT} \
+          --model openai/gpt-oss-20b \
+          --tensor-parallel-size ${WORLD_SIZE} \
+          --distributed-executor-backend ray \
+          --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION} \
+          --max-num-seqs ${MAX_NUM_SEQS} \
+          --dtype bfloat16 \
+          --trust-remote-code
+      '

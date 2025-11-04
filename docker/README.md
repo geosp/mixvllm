@@ -1,41 +1,63 @@
-# MixVLLM Terminal and vLLM Integration
+# Docker Folder Documentation
 
-This project provides a lightweight terminal server (`mixvllm-terminal`) that integrates seamlessly with the vLLM model server (`vllm/vllm-openai:latest`).
+This folder contains Docker Compose configurations and environment examples for deploying MixVLLM services in different modes. It is organized into three subfolders:
 
-## Terminal Server Overview
+## Structure
+- `head/`
+- `stand_alone/`
+- `worker/`
 
-The terminal server offers a web-based interface for interacting with the vLLM model server. It is designed to be lightweight and avoids heavy machine learning dependencies. Key features include:
+---
 
-- **Web Interface**: Built using `xterm.js` for the frontend and `terminado` for the backend.
-- **Auto-Start**: Automatically connects to the model server when a terminal session begins.
-- **Customizable**: Configurable host, port, and auto-start behavior.
+## 1. `head/`
+**Purpose:** Configuration for the Ray head node in a distributed setup.
 
-## Integration with vLLM
+**Contents:**
+- `docker-compose.yml`: Defines the Ray head node service, including GPU, RDMA, and NCCL settings. Uses environment variables from `.env`.
+- `.env.example`: Example environment file for cluster, NCCL, CUDA, and Hugging Face cache settings.
 
-The `docker-compose.yml` file integrates the terminal server with the vLLM model server. The `model-server` service uses the official `vllm/vllm-openai:latest` image, while the `terminal-server` service uses the `mixvllm-terminal` image. Communication between the two services is facilitated via HTTP, using the `MODEL_SERVER_URL` environment variable.
+**Key Features:**
+- Uses NVIDIA GPU and RDMA devices for high-performance distributed inference.
+- Extensive NCCL and Ray environment configuration for cluster networking and debugging.
 
-## How It Works
+---
 
-1. **Model Server**:
-   - Runs the vLLM model server, exposing an OpenAI-compatible REST API on port 8000.
-   - Supports GPU acceleration and tensor parallelism for efficient model inference.
+## 2. `stand_alone/`
+**Purpose:** Standalone deployment for model and terminal servers.
 
-2. **Terminal Server**:
-   - Provides a web-based terminal interface on port 8888.
-   - Connects to the model server to send and receive chat completions.
+**Contents:**
+- `docker-compose.yml`: Defines two services:
+  - `model-server`: Runs a vLLM model server with GPU support and Hugging Face cache.
+  - `terminal-server`: Runs a terminal server (image: `ghcr.io/geosp/mixvllm:main`).
 
-## Quick Start
+**Key Features:**
+- Simple deployment for local or single-node use.
+- GPU resources reserved for model server.
+- Hugging Face token support via environment variable.
 
-Follow the steps in the `docker-compose.yml` file to start both the model server and terminal server. Once running, access the terminal interface at `http://localhost:8888` and the model API at `http://localhost:8000`.
+---
 
-## Environment Variable Configuration
+## 3. `worker/`
+**Purpose:** Configuration for Ray worker nodes in a distributed setup.
 
-### MODEL_SERVER_URL
+**Contents:**
+- `docker-compose.yml`: Defines the Ray worker node service, similar to the head node but with `RAY_MODE=worker`.
+- `.env.exmple`: Example environment file for worker-specific settings.
 
-The `MODEL_SERVER_URL` environment variable has been added to the `docker-compose.yml` file for the `terminal-server` service. This variable points to the `model-server` service, ensuring that the terminal server knows where to send requests. By default, it is set to:
+**Key Features:**
+- Inherits NCCL, CUDA, and Ray settings for distributed operation.
+- GPU and RDMA device configuration for high-performance networking.
 
-```yaml
-MODEL_SERVER_URL=http://model-server:8000
-```
+---
 
-This allows the `DEFAULT_BASE_URL` in the `chat` script to dynamically adapt to the Docker Compose setup.
+## Usage
+- Copy `.env.example` or `.env.exmple` to `.env` and adjust values for your cluster.
+- Use `docker-compose up` in the desired subfolder to start services.
+- For distributed setups, start the head node first, then workers.
+
+---
+
+## Notes
+- Ensure RDMA and GPU devices are available and properly configured on your host machines.
+- Hugging Face cache paths and tokens should be set according to your environment.
+- For more details, see each subfolder's `docker-compose.yml` and environment example files.
