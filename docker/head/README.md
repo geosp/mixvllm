@@ -49,15 +49,29 @@ volumes:
 - `NCCL_NET_GDR_LEVEL=5`: GPUDirect RDMA enabled
 - QoS settings (TC, SL, timeout, retry)
 
-### 4. Performance Settings
+### 4. Model Configuration
+Model settings are managed through the `model_registry.yml` file in the parent directory:
+```yaml
+models:
+  gpt-oss-20b:
+    model: openai/gpt-oss-20b
+    dtype: float16
+    tensor_parallel_size: 2
+    gpu_memory_utilization: 0.35
+    max_num_seqs: 8
+    description: Lightweight
+```
+
+The `launch_model.sh` script automatically loads these configurations based on the `MODEL_NAME` environment variable.
+
+### 5. Performance Settings
 ```yaml
 environment:
   - CUDA_VISIBLE_DEVICES=0
-  - GPU_MEMORY_UTILIZATION=0.35  # Conservative setting
-  - MAX_NUM_SEQS=16             # Batch size control
+  - MODEL_NAME=gpt-oss-20b  # References model_registry.yml
 ```
 
-### 5. Resource Limits
+### 6. Resource Limits
 ```yaml
 ulimits:
   memlock: -1        # Unlimited for RDMA
@@ -97,6 +111,31 @@ ulimits:
 - Tensor parallelism support
 - NCCL for GPU communication
 - Multi-GPU model optimization
+
+## Model Configuration Management
+
+### 1. Model Registry
+The `model_registry.yml` in the parent directory manages model configurations:
+- Model paths and identifiers
+- Data types and precision settings
+- Tensor parallelism configuration
+- Memory and batch size settings
+
+### 2. Dynamic Model Loading
+The `launch_model.sh` script provides:
+- Dynamic configuration loading
+- Environment-based model selection
+- Consistent deployment across nodes
+- Automatic parameter management
+
+### 3. Usage
+1. Select model via environment:
+   ```bash
+   # In .env file
+   MODEL_NAME=gpt-oss-20b
+   ```
+2. Configuration is automatically loaded
+3. Model server launched with optimal settings
 
 ## Usage
 

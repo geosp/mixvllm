@@ -35,6 +35,42 @@ uv sync --all-extras
 uv sync
 ```
 
+### Model Configuration
+
+Models are configured through `docker/model_registry.yml`. Each model entry specifies:
+- Model identifier and path
+- Data type (float16, bfloat16)
+- Tensor parallelism degree
+- GPU memory utilization
+- Maximum concurrent sequences
+
+Example configuration:
+```yaml
+gpt-oss-20b:
+  model: openai/gpt-oss-20b
+  dtype: float16
+  tensor_parallel_size: 2
+  gpu_memory_utilization: 0.35
+  max_num_seqs: 8
+  description: Lightweight
+```
+
+### Deployment
+
+1. Set the model in your environment:
+```bash
+# In .env file
+MODEL_NAME=gpt-oss-20b  # Must match an entry in model_registry.yml
+```
+
+2. Launch the service:
+```bash
+cd docker/head  # or docker/worker for distributed setup
+docker compose up -d
+```
+
+The `launch_model.sh` script will automatically load the appropriate configuration from the model registry.
+
 ### Activate Environment
 
 ```bash
@@ -57,6 +93,8 @@ source .venv/bin/activate
 │   ├── mcp_servers.yaml             # MCP servers configuration
 │   └── phi3-mini-with-terminal.yaml # Configuration for Phi-3 model
 ├── docker/                          # Docker deployment configurations
+│   ├── launch_model.sh             # Dynamic model launch script
+│   ├── model_registry.yml          # Model configurations registry
 │   ├── head/                        # Ray head node setup
 │   │   ├── docker-compose.yml       # Head node container config
 │   │   ├── .env.example            # Environment template for head
