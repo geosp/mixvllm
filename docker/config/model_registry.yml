@@ -1,0 +1,17 @@
+models:
+  gpt-oss-20b:
+    model: openai/gpt-oss-20b
+    dtype: bfloat16
+    tensor-parallel-size: 2
+    gpu-memory-utilization: 0.35
+    max-num-seqs: 8
+    max-model-len: 131072
+    description: Lightweight
+  gpt-oss-120b:
+    model: openai/gpt-oss-120b
+    dtype: bfloat16
+    tensor-parallel-size: 2
+    gpu-memory-utilization: 0.55
+    max-num-seqs: 8
+    max-model-len: 131072
+    description: Full-capacity

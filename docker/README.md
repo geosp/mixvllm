@@ -91,6 +91,54 @@ graph TB
     HNIC <--> |RoCE v2<br/>12GB/s, MTU 9000| WNIC
 ```
 
+## Model Configuration System
+
+### 1. Registry (`./config/model_registry.yml`)
+Central configuration for all supported models:
+
+```yaml
+models:
+  gpt-oss-20b:
+    model: openai/gpt-oss-20b
+    dtype: bfloat16
+    tensor-parallel-size: 2
+    gpu-memory-utilization: 0.35
+    max-num-seqs: 8
+    max-model-len: 131072
+    description: Lightweight
+```
+
+### 2. Python Launcher (`./config/launch.py`)
+Robust model launching system with features:
+
+- **Configuration Management**:
+  - YAML parsing with error handling
+  - Model settings validation
+  - Smart CLI argument generation
+
+- **User Experience**:
+  - Dry-run capability (`--dry-run`)
+  - Available models listing
+  - Clear error messages
+  - Pretty-printed output
+
+- **Runtime Features**:
+  - Signal handling (Ctrl+C support)
+  - Environment variable configuration
+  - Flexible parameter parsing
+
+Usage:
+```bash
+# Launch a model
+MODEL_NAME=gpt-oss-20b python launch.py
+
+# Validate configuration
+MODEL_NAME=gpt-oss-20b python launch.py --dry-run
+
+# See available models
+MODEL_NAME=invalid-model python launch.py
+```
+
 ## Implementation Details
 
 ### 1. Head Node (`./head/`)

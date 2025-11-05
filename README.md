@@ -1,6 +1,13 @@
 # vLLM Development Environment
 
-Development environment for vLLM supporting both single-machine tensor parallelism and distributed inference across multiple nodes.
+A flexible development environment for vLLM that provides:
+- Single-machine tensor parallelism and distributed inference
+- Python-based configuration management
+- Dynamic model deployment system
+- Comprehensive parameter customization
+- RDMA-optimized networking
+
+The environment uses a YAML-based registry for model configurations, supporting all vLLM parameters and features through a robust Python launcher.
 
 ## Deployment Options
 
@@ -37,22 +44,57 @@ uv sync
 
 ### Model Configuration
 
-Models are configured through `docker/model_registry.yml`. Each model entry specifies:
-- Model identifier and path
-- Data type (float16, bfloat16)
-- Tensor parallelism degree
-- GPU memory utilization
-- Maximum concurrent sequences
+Models are configured through `docker/config/model_registry.yml`. The configuration system is fully flexible and supports any vLLM parameter - each YAML key is automatically converted to a CLI argument (with `--` prefix).
 
-Example configuration:
+Common parameters include:
+```yaml
+model: "path/to/model"              # --model
+dtype: "bfloat16"                  # --dtype
+tensor-parallel-size: 2            # --tensor-parallel-size
+gpu-memory-utilization: 0.35       # --gpu-memory-utilization
+max-num-seqs: 8                    # --max-num-seqs
+max-model-len: 131072             # --max-model-len
+trust-remote-code: true           # --trust-remote-code (flag only if true)
+enable-prefix-caching: true       # --enable-prefix-caching (flag only if true)
+description: "..."                # (metadata, not passed to vLLM)
+```
+
+Example registry entry:
 ```yaml
 gpt-oss-20b:
   model: openai/gpt-oss-20b
-  dtype: float16
-  tensor_parallel_size: 2
-  gpu_memory_utilization: 0.35
-  max_num_seqs: 8
+  dtype: bfloat16
+  tensor-parallel-size: 2
+  gpu-memory-utilization: 0.35
+  max-num-seqs: 8
+  max-model-len: 131072
+  swap-space: 4                    # Additional vLLM parameter
+  max-num-batched-tokens: 8192     # Additional vLLM parameter
+  enable-prefix-caching: true      # Optional feature flag
   description: Lightweight
+```
+
+Any valid vLLM parameter can be added to the configuration. The launcher will automatically convert all parameters (except `description`) into appropriate command-line arguments.
+
+### Model Launch System
+
+The Python-based launch system (`docker/config/launch.py`) provides:
+- Robust YAML configuration parsing
+- Validation of model settings
+- Dry-run capability for testing
+- User-friendly error messages
+- Available models listing
+
+Features:
+```bash
+# Normal launch
+MODEL_NAME=gpt-oss-20b python launch.py
+
+# Validate configuration
+MODEL_NAME=gpt-oss-20b python launch.py --dry-run
+
+# See error messages and available models
+MODEL_NAME=invalid-model python launch.py
 ```
 
 ### Deployment
@@ -69,7 +111,7 @@ cd docker/head  # or docker/worker for distributed setup
 docker compose up -d
 ```
 
-The `launch_model.sh` script will automatically load the appropriate configuration from the model registry.
+The Python launcher will automatically load and validate the configuration before starting the model.
 
 ### Activate Environment
 
@@ -93,8 +135,9 @@ source .venv/bin/activate
 │   ├── mcp_servers.yaml             # MCP servers configuration
 │   └── phi3-mini-with-terminal.yaml # Configuration for Phi-3 model
 ├── docker/                          # Docker deployment configurations
-│   ├── launch_model.sh             # Dynamic model launch script
-│   ├── model_registry.yml          # Model configurations registry
+│   ├── config/                      # Configuration directory
+│   │   ├── launch.py               # Python-based model launcher
+│   │   └── model_registry.yml      # Model configurations
 │   ├── head/                        # Ray head node setup
 │   │   ├── docker-compose.yml       # Head node container config
 │   │   ├── .env.example            # Environment template for head
