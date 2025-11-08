@@ -23,10 +23,13 @@ services:
     ipc: host
 
     command: >
-      --model openai/gpt-oss-20b
-      --tensor-parallel-size 2
-      --gpu-memory-utilization 0.85
-      --max-num-seqs 32
+      --host 0.0.0.0
+      --port 8000
+      --model TheBloke/Mistral-7B-Instruct-v0.2-AWQ
+      --quantization awq
+      --dtype float16
+      --gpu-memory-utilization 0.95
+      --max-num-seqs 4
 
     restart: unless-stopped
 

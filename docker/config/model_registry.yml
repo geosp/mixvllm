@@ -15,3 +15,28 @@ models:
     max-num-seqs: 8
     max-model-len: 131072
     description: Full-capacity
+  llama-4:
+    model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+    dtype: bfloat16
+    tensor-parallel-size: 2
+    gpu-memory-utilization: 0.75
+    max-num-seqs: 8
+    max-model-len: 131072
+    description: "MoE multimodal long-context model (17B active, 16 experts)"
+  deepseek-r1-70b:
+    model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+    dtype: bfloat16
+    tensor-parallel-size: 2
+    gpu-memory-utilization: 0.60 
+    max-num-seqs: 8
+    max-model-len: 65536
+    description: DeepSeek-R1-Distill-Llama-70B (reasoning-optimized)
+  mixtral-8x7b:
+    model: mistralai/Mixtral-8x7B-Instruct-v0.1
+    dtype: bfloat16
+    tensor-parallel-size: 2
+    gpu-memory-utilization: 0.80
+    max-num-seqs: 8 
+    max-model-len: 32768
+    description: Mixtral-8×7B Instruct (MoE)
+
