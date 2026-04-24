@@ -35,10 +35,11 @@ models:
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
     dtype: bfloat16
     tensor-parallel-size: 2
-    gpu-memory-utilization: 0.75
+    gpu-memory-utilization: 0.70
     max-num-seqs: 8
     max-model-len: 131072
     trust-remote-code: true
+    attention-backend: triton_attn
     description: "Nemotron-3-Super 120B MoE FP8 (12B active params)"
   mixtral-8x7b:
     model: mistralai/Mixtral-8x7B-Instruct-v0.1

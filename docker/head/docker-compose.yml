@@ -1,6 +1,6 @@
 services:
   ray-node:
-    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:25.10-py3
+    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.02-py3
     container_name: ray-${RAY_MODE}
     network_mode: host
     ipc: host
@@ -85,7 +85,7 @@ services:
       '
 
   vllm:
-    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:25.10-py3
+    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.02-py3
     container_name: vllm-server
     network_mode: host
     ipc: host
