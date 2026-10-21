@@ -2,8 +2,15 @@
 """
 vLLM launcher - reads model config from registry YAML and launches vLLM.
 Usage: MODEL_NAME=gpt-oss-20b python launch.py [--dry-run]
+
+Multi-node (vLLM's built-in mp launcher, no Ray) is enabled by CLUSTER_NNODES > 1.
+Every node runs this script with the same MODEL_NAME; rank 0 serves the API and
+the other ranks run headless:
+  CLUSTER_NNODES=2 CLUSTER_NODE_RANK=0|1 CLUSTER_MASTER_ADDR=192.168.100.1
+  CLUSTER_MASTER_PORT=29501 (optional)
 """
 
+import os
 import sys
 import subprocess
 from pathlib import Path
@@ -93,9 +100,35 @@ def config_to_cli_args(config):
     return args
 
 
-def main():
-    import os
+def cluster_cli_args():
+    """
+    Build multi-node args from CLUSTER_* env vars (empty list for single node).
+    Rank 0 hosts the API server; other ranks add --headless.
+    """
+    nnodes = int(os.getenv("CLUSTER_NNODES", "1"))
+    if nnodes <= 1:
+        return []
 
+    rank = int(os.getenv("CLUSTER_NODE_RANK", "0"))
+    master_addr = os.getenv("CLUSTER_MASTER_ADDR")
+    if not master_addr:
+        print("❌ CLUSTER_MASTER_ADDR must be set when CLUSTER_NNODES > 1", file=sys.stderr)
+        sys.exit(1)
+
+    args = [
+        "--distributed-executor-backend", "mp",
+        "--nnodes", str(nnodes),
+        "--node-rank", str(rank),
+        "--master-addr", master_addr,
+        "--master-port", os.getenv("CLUSTER_MASTER_PORT", "29501"),
+    ]
+    if rank > 0:
+        args.append("--headless")
+
+    return args
+
+
+def main():
     # Parse CLI arguments
     dry_run = "--dry-run" in sys.argv
 
@@ -112,7 +145,7 @@ def main():
     config = get_model_config(registry, model_name)
 
     # Convert config to CLI args
-    cli_args = config_to_cli_args(config)
+    cli_args = config_to_cli_args(config) + cluster_cli_args()
 
     # Build command (`python -m vllm.entrypoints.openai.api_server` is deprecated since vLLM 0.29)
     cmd = ["vllm", "serve", config["model"]]
