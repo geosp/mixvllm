@@ -1,12 +1,16 @@
 models:
-  gpt-oss-20b:
-    model: openai/gpt-oss-20b
+  nemotron-3-nano:
+    model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
     dtype: bfloat16
     tensor-parallel-size: 2
-    gpu-memory-utilization: 0.35
+    gpu-memory-utilization: 0.45
     max-num-seqs: 8
-    max-model-len: 131072
-    description: Lightweight
+    max-model-len: 262144
+    trust-remote-code: true
+    reasoning-parser: nemotron_v3
+    enable-auto-tool-choice: true
+    tool-call-parser: qwen3_coder
+    description: "Nemotron 3 Nano 30B MoE (3B active): lightweight, fast"
   gpt-oss-120b:
     model: openai/gpt-oss-120b
     dtype: bfloat16
@@ -15,22 +19,6 @@ models:
     max-num-seqs: 8
     max-model-len: 131072
     description: Full-capacity
-  llama-4:
-    model: meta-llama/Llama-4-Scout-17B-16E-Instruct
-    dtype: bfloat16
-    tensor-parallel-size: 2
-    gpu-memory-utilization: 0.75
-    max-num-seqs: 8
-    max-model-len: 131072
-    description: "MoE multimodal long-context model (17B active, 16 experts)"
-  deepseek-r1-70b:
-    model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-    dtype: bfloat16
-    tensor-parallel-size: 2
-    gpu-memory-utilization: 0.60 
-    max-num-seqs: 8
-    max-model-len: 65536
-    description: DeepSeek-R1-Distill-Llama-70B (reasoning-optimized)
   nemotron-super-120b:
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
     dtype: bfloat16
@@ -56,12 +44,4 @@ models:
     enable-auto-tool-choice: true
     tool-call-parser: qwen3_coder
     description: "Qwen3.8-Flash-Next NVFP4 MoE (native 262K ctx; MTP off until tested)"
-  mixtral-8x7b:
-    model: mistralai/Mixtral-8x7B-Instruct-v0.1
-    dtype: bfloat16
-    tensor-parallel-size: 2
-    gpu-memory-utilization: 0.80
-    max-num-seqs: 8 
-    max-model-len: 32768
-    description: Mixtral-8×7B Instruct (MoE)
 
