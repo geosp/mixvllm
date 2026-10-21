@@ -41,7 +41,6 @@ services:
       - NCCL_IB_TIMEOUT=${NCCL_IB_TIMEOUT}
       - NCCL_IB_RETRY_CNT=${NCCL_IB_RETRY_CNT}
       - NCCL_TIMEOUT=${NCCL_TIMEOUT}
-      - HF_HUB_DISABLE_XET=${HF_HUB_DISABLE_XET}
       - VLLM_LOGGING_LEVEL=INFO
     devices:
       - /dev/infiniband:/dev/infiniband

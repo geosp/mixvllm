@@ -42,7 +42,6 @@ services:
       - NCCL_IB_RETRY_CNT=${NCCL_IB_RETRY_CNT}
       - NCCL_TIMEOUT=${NCCL_TIMEOUT}
       - NCCL_IB_GDR_DMABUF_ENABLE=${NCCL_IB_GDR_DMABUF_ENABLE}
-      - HF_HUB_DISABLE_XET=${HF_HUB_DISABLE_XET}
       - VLLM_LOGGING_LEVEL=INFO
 
     # RDMA device + sysfs visibility inside the container
