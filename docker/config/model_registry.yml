@@ -35,6 +35,26 @@ models:
     tool-call-parser: qwen3_xml
     # Template has no effort levels, only thinking on/off ({"enable_thinking": false}); default on
     description: "Qwen3.6-35B-A3B NVFP4 MoE (3B active, ~22 GiB; gpt-oss-120b replacement candidate)"
+  qwen3.8-27b:
+    model: nvidia/Qwen3.8-27B-NVFP4
+    served-model-name: [qwen3.8-27b, spark]
+    # Dense 27B (every weight read per token): slower than the MoE models, near DeepSeek V4 Flash quality.
+    # Flags from the model card's 4-GPU command, at TP=2; MTP layer is in the checkpoint.
+    tensor-parallel-size: 2
+    kv-cache-dtype: fp8_e4m3
+    gpu-memory-utilization: 0.55
+    max-model-len: 262144
+    max-num-seqs: 8
+    max-num-batched-tokens: 8192
+    enable-chunked-prefill: true
+    mm-encoder-tp-mode: data
+    speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
+    reasoning-parser: qwen3
+    enable-auto-tool-choice: true
+    tool-call-parser: qwen3_coder
+    # Template default is "xhigh"; accepts low | medium | xhigh only ("high" is rejected)
+    default-chat-template-kwargs: '{"reasoning_effort": "low"}'
+    description: "Qwen3.8-27B NVFP4 dense VLM (fine-tuning base candidate; ~20 GiB)"
   nemotron-3.5-super-vl:
     model: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4
     served-model-name: [nemotron-3.5-super-vl, spark]
