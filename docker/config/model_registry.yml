@@ -54,6 +54,8 @@ models:
     enable-auto-tool-choice: true
     tool-call-parser: deepseek_v4
     reasoning-parser: deepseek_v4
+    # DSpark drafter is built into the checkpoint (values from the model card); JSON string, not a mapping
+    speculative-config: '{"method":"dspark","num_speculative_tokens":7,"draft_sample_method":"greedy"}'
     description: "DeepSeek V4 Flash 0731 FP8 (284B, 13B active; ~78 GiB/node; needs vLLM >= 0.32)"
   qwen3.8-flash-next:
     model: nvidia/Qwen3.8-Flash-Next-NVFP4
