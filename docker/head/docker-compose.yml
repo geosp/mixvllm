@@ -49,6 +49,8 @@ services:
       - ../config:/config:ro
       - ${HF_HOME}:/root/.cache/huggingface
       - ${HARMONY_ENCODINGS}:/etc/encodings/:ro
+      # torch.compile / FlashInfer autotune cache survives container recreation (per node: no NFS races)
+      - /mnt/shared/vllm-compile-cache/head:/root/.cache/vllm
       - /sys/class/infiniband:/sys/class/infiniband:ro
       - /sys/class/net:/sys/class/net:ro
       - /etc/rdma:/etc/rdma:ro

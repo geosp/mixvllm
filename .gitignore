@@ -60,3 +60,6 @@ Thumbs.db
 # Temporary files
 .claude/scratch/*
 !.claude/scratch/.gitkeep
+
+# Per-node docker env files (hold HF token)
+docker/*/.env
