@@ -9,6 +9,8 @@ models:
     gpu-memory-utilization: 0.55
     max-num-seqs: 8
     max-model-len: 131072
+    # Harmony format: vLLM ignores server-side defaults for gpt-oss, so effort stays "medium"
+    # unless the request sets reasoning_effort (low | medium | high).
     description: Full-capacity
   nemotron-3.5-super-vl:
     model: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4
@@ -28,6 +30,9 @@ models:
     enable-auto-tool-choice: true
     tool-call-parser: qwen3_coder
     reasoning-parser: nemotron_v3
+    # No "low" level: medium_effort is the lightest setting with thinking on. Requests override it
+    # with chat_template_kwargs {"medium_effort": false} (full) or {"enable_thinking": false} (off).
+    default-chat-template-kwargs: '{"medium_effort": true}'
     description: "Nemotron 3.5 Super VL NVFP4 (text+image; card targets vLLM 0.32, MTP off)"
   deepseek-v4-flash:
     model: deepseek-ai/DeepSeek-V4-Flash-0731
@@ -45,6 +50,8 @@ models:
     reasoning-parser: deepseek_v4
     # DSpark drafter is built into the checkpoint (values from the model card); JSON string, not a mapping
     speculative-config: '{"method":"dspark","num_speculative_tokens":4,"draft_sample_method":"greedy"}'
+    # Server default effort (vLLM's own default is "high"); requests override with reasoning_effort
+    default-chat-template-kwargs: '{"reasoning_effort": "low"}'
     description: "DeepSeek V4 Flash 0731 FP8 (284B, 13B active; ~78 GiB/node; needs vLLM >= 0.32)"
   qwen3.8-flash-next:
     model: nvidia/Qwen3.8-Flash-Next-NVFP4
@@ -59,5 +66,7 @@ models:
     reasoning-parser: qwen3
     enable-auto-tool-choice: true
     tool-call-parser: qwen3_coder
+    # Template default is "xhigh"; accepts low | medium | xhigh only ("high" is rejected)
+    default-chat-template-kwargs: '{"reasoning_effort": "low"}'
     description: "Qwen3.8-Flash-Next NVFP4 MoE (native 262K ctx; MTP off until tested)"
 

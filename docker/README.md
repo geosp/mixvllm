@@ -70,6 +70,26 @@ Every entry sets `served-model-name: [<own name>, spark]`. A list becomes one fl
 values. Clients can always request model `spark` and get whichever model is loaded; the model's
 own name keeps working too (and is the name reported back in responses).
 
+### Reasoning effort
+Server defaults come from `default-chat-template-kwargs` in each registry entry; a request's own
+value always wins (vLLM drops unset request values before merging).
+
+| Model | Server default | Per request |
+|---|---|---|
+| `qwen3.8-flash-next` | `low` (template default `xhigh`) | `"reasoning_effort"`: `low`, `medium`, `xhigh` (`high` is rejected) |
+| `deepseek-v4-flash` | `low` (vLLM default `high`) | `"reasoning_effort"`: `low`, `high`, `max`; `none` = no thinking |
+| `nemotron-3.5-super-vl` | medium effort (no "low" level) | `"chat_template_kwargs"`: `{"medium_effort": false}` = full, `{"enable_thinking": false}` = off |
+| `openai/gpt-oss-120b` | `medium`, not changeable server-side (Harmony format ignores template defaults) | `"reasoning_effort"`: `low`, `medium`, `high` |
+
+Clients that call the `spark` alias without knowing which model is loaded should only send
+`"reasoning_effort": "low"` (accepted by every model; Nemotron simply ignores it) or nothing.
+
+```bash
+curl -s http://10.0.0.96:8000/v1/chat/completions -H "Content-Type: application/json" \
+  -d '{"model": "spark", "reasoning_effort": "low", "max_tokens": 4000,
+       "messages": [{"role": "user", "content": "Explain RDMA in two sentences."}]}'
+```
+
 Set `gpu-memory-utilization` explicitly: vLLM's default (0.92) is too high on unified memory,
 where the OS and page cache share the same pool.
 
