@@ -1,6 +1,9 @@
+# served-model-name: first name is the model's own API name; "spark" is a stable alias that
+# always points at whichever model is loaded, so clients don't break on model switches.
 models:
   gpt-oss-120b:
     model: openai/gpt-oss-120b
+    served-model-name: [openai/gpt-oss-120b, spark]
     dtype: bfloat16
     tensor-parallel-size: 2
     gpu-memory-utilization: 0.55
@@ -9,6 +12,7 @@ models:
     description: Full-capacity
   nemotron-super-120b:
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    served-model-name: [nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, spark]
     dtype: bfloat16
     tensor-parallel-size: 2
     gpu-memory-utilization: 0.70
@@ -19,7 +23,7 @@ models:
     description: "Nemotron-3-Super 120B MoE FP8 (12B active params)"
   nemotron-3.5-super-vl:
     model: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4
-    served-model-name: nemotron-3.5-super-vl
+    served-model-name: [nemotron-3.5-super-vl, spark]
     tensor-parallel-size: 2
     trust-remote-code: true
     gpu-memory-utilization: 0.75
@@ -38,7 +42,7 @@ models:
     description: "Nemotron 3.5 Super VL NVFP4 (text+image; card targets vLLM 0.32, MTP off)"
   qwen3.8-flash-next:
     model: nvidia/Qwen3.8-Flash-Next-NVFP4
-    served-model-name: qwen3.8-flash-next
+    served-model-name: [qwen3.8-flash-next, spark]
     tensor-parallel-size: 2
     enable-expert-parallel: true
     all2all-backend: allgather_reducescatter

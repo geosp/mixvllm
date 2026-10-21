@@ -66,6 +66,10 @@ models:
     description: Full-capacity
 ```
 
+Every entry sets `served-model-name: [<own name>, spark]`. A list becomes one flag with several
+values. Clients can always request model `spark` and get whichever model is loaded; the model's
+own name keeps working too (and is the name reported back in responses).
+
 Set `gpu-memory-utilization` explicitly: vLLM's default (0.92) is too high on unified memory,
 where the OS and page cache share the same pool.
 

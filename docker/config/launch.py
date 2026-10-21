@@ -78,6 +78,7 @@ def config_to_cli_args(config):
     - Skip 'model' (passed positionally to `vllm serve`)
     - For boolean True: add flag with no value (e.g., --trust-remote-code)
     - For boolean False: skip it
+    - For lists: add flag followed by each item (e.g., --served-model-name qwen spark)
     - For other values: add flag with value (e.g., --model openai/gpt-oss-20b)
     """
     args = []
@@ -93,6 +94,10 @@ def config_to_cli_args(config):
             # Boolean flag: only add if True
             if value:
                 args.append(flag)
+        elif isinstance(value, list):
+            # Multi-value flag: one flag, several values
+            args.append(flag)
+            args.extend(str(v) for v in value)
         else:
             # Value flag: add both flag and value
             args.extend([flag, str(value)])
