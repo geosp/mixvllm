@@ -12,29 +12,6 @@ models:
     # Harmony format: vLLM ignores server-side defaults for gpt-oss, so effort stays "medium"
     # unless the request sets reasoning_effort (low | medium | high).
     description: Full-capacity
-  qwen3.6-35b-a3b:
-    model: nvidia/Qwen3.6-35B-A3B-NVFP4
-    served-model-name: [qwen3.6-35b-a3b, spark]
-    # Flags from the model card's DGX Spark recipe (which uses one Spark: TP=1, max-num-seqs 4)
-    tensor-parallel-size: 2
-    trust-remote-code: true
-    kv-cache-dtype: fp8
-    attention-backend: flashinfer
-    moe-backend: marlin
-    gpu-memory-utilization: 0.40
-    max-model-len: 262144
-    max-num-seqs: 8
-    max-num-batched-tokens: 8192
-    enable-chunked-prefill: true
-    async-scheduling: true
-    enable-prefix-caching: true
-    speculative-config: '{"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}'
-    load-format: fastsafetensors
-    reasoning-parser: qwen3
-    enable-auto-tool-choice: true
-    tool-call-parser: qwen3_xml
-    # Template has no effort levels, only thinking on/off ({"enable_thinking": false}); default on
-    description: "Qwen3.6-35B-A3B NVFP4 MoE (3B active, ~22 GiB; gpt-oss-120b replacement candidate)"
   qwen3.8-27b:
     model: nvidia/Qwen3.8-27B-NVFP4
     served-model-name: [qwen3.8-27b, spark]
