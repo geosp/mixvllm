@@ -68,6 +68,7 @@ def config_to_cli_args(config):
     
     Rules:
     - Skip 'description' (metadata only)
+    - Skip 'model' (passed positionally to `vllm serve`)
     - For boolean True: add flag with no value (e.g., --trust-remote-code)
     - For boolean False: skip it
     - For other values: add flag with value (e.g., --model openai/gpt-oss-20b)
@@ -75,8 +76,8 @@ def config_to_cli_args(config):
     args = []
 
     for key, value in config.items():
-        # Skip metadata
-        if key == "description":
+        # Skip metadata and the positional model
+        if key in ("description", "model"):
             continue
 
         flag = f"--{key}"
@@ -113,12 +114,8 @@ def main():
     # Convert config to CLI args
     cli_args = config_to_cli_args(config)
 
-    # Build command
-    cmd = [
-        sys.executable,
-        "-m",
-        "vllm.entrypoints.openai.api_server",
-    ]
+    # Build command (`python -m vllm.entrypoints.openai.api_server` is deprecated since vLLM 0.29)
+    cmd = ["vllm", "serve", config["model"]]
     cmd.extend(cli_args)
 
     # Print what we're about to run
