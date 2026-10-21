@@ -11,6 +11,7 @@ the other ranks run headless:
 """
 
 import os
+import shlex
 import sys
 import subprocess
 from pathlib import Path
@@ -163,7 +164,7 @@ def main():
     print(f"   Registry: {REGISTRY_PATH}")
     print()
     print(f"▶️  Command:")
-    print(f"   {' '.join(cmd)}")
+    print(f"   {shlex.join(cmd)}")  # shell-quoted, so it can be copy-pasted
     print()
 
     if dry_run:
