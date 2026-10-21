@@ -1,16 +1,4 @@
 models:
-  nemotron-3-nano:
-    model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
-    dtype: bfloat16
-    tensor-parallel-size: 2
-    gpu-memory-utilization: 0.45
-    max-num-seqs: 8
-    max-model-len: 262144
-    trust-remote-code: true
-    reasoning-parser: nemotron_v3
-    enable-auto-tool-choice: true
-    tool-call-parser: qwen3_coder
-    description: "Nemotron 3 Nano 30B MoE (3B active): lightweight, fast"
   gpt-oss-120b:
     model: openai/gpt-oss-120b
     dtype: bfloat16
