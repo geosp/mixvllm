@@ -1,296 +1,147 @@
-# Distributed Large Language Model Inference with Ray and vLLM
+# Distributed LLM Inference with vLLM (2-node, RoCE)
 
 ## Overview
-This implementation provides a high-performance distributed inference setup for Large Language Models using Ray and vLLM, optimized with RDMA over Converged Ethernet (RoCE) for inter-node communication.
+Two DGX Spark–class nodes (GB10, 121 GB unified memory each) serve one model with tensor
+parallelism 2 across nodes. vLLM's built-in multi-node launcher coordinates the nodes;
+NCCL moves tensors between the GPUs over RDMA (RoCE v2, MTU 9000, ~111 Gb/s).
 
-```mermaid
-graph TB
-    subgraph "Distributed System Architecture"
-        subgraph Head["Head Node (Ray Master)"]
-            HGPU["GPU 0"]
-        end
-        subgraph Worker["Worker Node (Ray Worker)"]
-            WGPU["GPU 0"]
-        end
-        
-        Head <--> |RDMA Network<br/>12 GB/s bandwidth| Worker
-        Head --- HGPU
-        Worker --- WGPU
-    end
-```
-
-## Architecture Components
-
-### 1. Ray Cluster
-Ray provides the distributed computing framework, managing resources and coordinating model inference across nodes.
+There is **no Ray**. NVIDIA's vLLM container from 26.09 on ships without it, and each node
+simply runs `vllm serve` with its own rank.
 
 ```mermaid
 graph LR
-    subgraph Head["Head Node (192.168.100.1)"]
-        RH["Ray Head"]
-        Redis["Redis"]
-        Sched["Scheduler"]
-        OS1["Object Store"]
+    C["Clients<br/>OpenAI API :8000"] --> H
+    subgraph H["spark-01 · rank 0 · 192.168.100.1"]
+        API["vLLM API server"]
+        T0["TP shard 0 (GPU)"]
+        API --- T0
     end
-
-    subgraph Worker["Worker Node (192.168.100.2)"]
-        RW["Ray Worker"]
-        GW["GPU Worker"]
-        OS2["Object Store"]
+    subgraph W["spark-02 · rank 1 · 192.168.100.2"]
+        T1["TP shard 1 (GPU)<br/>--headless"]
     end
-
-    Head <--> |Ray Protocol| Worker
+    T0 <-->|"NCCL over RoCE<br/>roceP2p1s0f0"| T1
+    H -.->|"rendezvous :29501"| W
 ```
 
-### 2. vLLM Integration
-vLLM handles efficient LLM inference with:
-- PagedAttention for optimized memory usage
-- Tensor parallelism across GPUs
-- Continuous batching for higher throughput
+| | Head (`./head/`) | Worker (`./worker/`) |
+|---|---|---|
+| Container | `vllm-server` | `vllm-worker` |
+| Rank | 0 (serves the API on :8000) | 1 (`--headless`, no API) |
+| Image | `nvidia/vllm:26.09-py3` (vLLM 0.29.0, CUDA 13.4.1) | same |
+| Compile cache | `/mnt/shared/vllm-compile-cache/head` | `/mnt/shared/vllm-compile-cache/worker` |
 
-```mermaid
-graph TB
-    subgraph Head["Head Node"]
-        MS1["Model Shard 1"]
-        PAC1["PagedAttention Cache"]
-        MS1 --- PAC1
-    end
+## Starting and stopping
 
-    subgraph Worker["Worker Node"]
-        MS2["Model Shard 2"]
-        PAC2["PagedAttention Cache"]
-        MS2 --- PAC2
-    end
+Start the head first: rank 0 hosts the rendezvous the worker connects to.
 
-    MS1 <--> |NCCL| MS2
+```bash
+# spark-01
+cd docker/head && docker compose up -d
+# spark-02
+cd docker/worker && docker compose up -d
+
+# wait for "Application startup complete" (about 2 minutes for gpt-oss-120b)
+docker logs -f --tail=20 vllm-server
+curl http://10.0.0.96:8000/health
 ```
 
-## Network Architecture
+Stop the worker first, then the head (`docker compose down` in each directory).
+If either side has to restart, restart both in that order (worker down, head up, worker up).
 
-### RDMA Configuration
-The setup uses RoCE v2 for high-speed inter-node communication:
+## Model configuration
 
-```mermaid
-graph TB
-    subgraph Head["Head Node"]
-        HNIC["RDMA NIC"]
-        HGDR["GPUDirect RDMA"]
-        HGPU["GPU"]
-        HNIC --- HGDR
-        HGDR --- HGPU
-    end
-
-    subgraph Worker["Worker Node"]
-        WNIC["RDMA NIC"]
-        WGDR["GPUDirect RDMA"]
-        WGPU["GPU"]
-        WNIC --- WGDR
-        WGDR --- WGPU
-    end
-
-    HNIC <--> |RoCE v2<br/>12GB/s, MTU 9000| WNIC
-```
-
-## Model Configuration System
-
-### 1. Registry (`./config/model_registry.yml`)
-Central configuration for all supported models:
+### Registry (`./config/model_registry.yml`)
+One entry per model. Every key except `description` becomes a `vllm serve` flag
+(`true` → bare flag, `false` → omitted). `model` is passed positionally.
 
 ```yaml
 models:
-  gpt-oss-20b:
-    model: openai/gpt-oss-20b
+  gpt-oss-120b:
+    model: openai/gpt-oss-120b
     dtype: bfloat16
     tensor-parallel-size: 2
-    gpu-memory-utilization: 0.35
+    gpu-memory-utilization: 0.55
     max-num-seqs: 8
     max-model-len: 131072
-    description: Lightweight
+    description: Full-capacity
 ```
 
-### 2. Python Launcher (`./config/launch.py`)
-Robust model launching system with features:
+Set `gpu-memory-utilization` explicitly: vLLM's default (0.92) is too high on unified memory,
+where the OS and page cache share the same pool.
 
-- **Configuration Management**:
-  - YAML parsing with error handling
-  - Model settings validation
-  - Smart CLI argument generation
+### Launcher (`./config/launch.py`)
+Both nodes run `python /config/launch.py`. It reads `MODEL_NAME`, looks it up in the registry,
+and adds the multi-node flags from the `CLUSTER_*` variables set in each compose file:
 
-- **User Experience**:
-  - Dry-run capability (`--dry-run`)
-  - Available models listing
-  - Clear error messages
-  - Pretty-printed output
+| Variable | Head | Worker | Becomes |
+|---|---|---|---|
+| `CLUSTER_NNODES` | 2 | 2 | `--distributed-executor-backend mp --nnodes 2` |
+| `CLUSTER_NODE_RANK` | 0 | 1 | `--node-rank N` (rank > 0 also gets `--headless`) |
+| `CLUSTER_MASTER_ADDR` | `${VLLM_HOST_IP}` | 192.168.100.1 | `--master-addr` |
+| `CLUSTER_MASTER_PORT` | 29501 | 29501 | `--master-port` |
 
-- **Runtime Features**:
-  - Signal handling (Ctrl+C support)
-  - Environment variable configuration
-  - Flexible parameter parsing
+With `CLUSTER_NNODES` unset or 1, it launches a plain single-node `vllm serve`.
 
-Usage:
 ```bash
-# Launch a model
-MODEL_NAME=gpt-oss-20b python launch.py
-
-# Validate configuration
-MODEL_NAME=gpt-oss-20b python launch.py --dry-run
-
-# See available models
-MODEL_NAME=invalid-model python launch.py
+MODEL_NAME=gpt-oss-120b python launch.py --dry-run       # print the command only
+MODEL_NAME=nope python launch.py --dry-run               # lists available models
 ```
 
-## Implementation Details
+**`MODEL_NAME` must be the same in both nodes' `.env`.** The registry itself comes from the
+same git repo on both nodes, so keep them on the same commit.
 
-### 1. Head Node (`./head/`)
-The head node serves as the Ray cluster manager and hosts the first model shard.
+## Per-node `.env`
+Not tracked in git (`docker/*/.env` is ignored; it holds the Hugging Face token).
+Key settings:
 
-Key configurations:
-```yaml
-# From docker-compose.yml
-services:
-  ray-node:
-    network_mode: host
-    environment:
-      - NCCL_IB_HCA=roceP2p1s0f0
-      - NCCL_NET_GDR_LEVEL=5
-```
+- `MODEL_NAME`: registry key, identical on both nodes
+- `VLLM_HOST_IP`: this node's RDMA-mesh IP (192.168.100.1 / .2)
+- `HF_HOME=/mnt/shared/huggingface`: model weights (NFS over RDMA on spark-02)
+- `HARMONY_ENCODINGS=/mnt/shared/harmony/encodings`, `TIKTOKEN_ENCODINGS_BASE=/etc/encodings`:
+  gpt-oss tokenizer files
+- NCCL settings (below)
 
-### 2. Worker Node (`./worker/`)
-Worker nodes connect to the head node and host additional model shards.
+Don't set `MASTER_ADDR`, `MASTER_PORT`, `RANK` or `WORLD_SIZE` there: PyTorch reads those
+names, and the launcher uses the `CLUSTER_*` variables instead.
 
-```yaml
-# From docker-compose.yml
-services:
-  ray-node:
-    environment:
-      - RAY_ADDRESS=192.168.100.1:6379
-      - VLLM_RAY_WORKER_ENV_VARS=NCCL_IB_DISABLE,NCCL_IB_HCA,...
-```
+## NCCL / RDMA settings
+These are hard-won on GB10 unified memory; change them one at a time.
 
-### 3. Data Flow
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant H as Head Node (8000)
-    participant TP as Tensor Parallelism
-    participant W as Worker Node
-    participant M as Response Merger
+| Setting | Value | Why |
+|---|---|---|
+| `NCCL_IB_HCA` | `roceP2p1s0f0` | the active RoCE device |
+| `NCCL_SOCKET_IFNAME` / `GLOO_SOCKET_IFNAME` | `enP2p1s0f0np0` | keep bootstrap traffic on the mesh |
+| `NCCL_NET_GDR_LEVEL` | 0 | GPUDirect RDMA disabled |
+| `NCCL_IB_GDR_DMABUF_ENABLE` | 0 | **required**: DMABUF hangs on GB10 with many communicators |
+| `NCCL_NET_PLUGIN` | `none` on the head | the HPC-X plugin causes DMABUF hangs |
+| `NCCL_IB_TC` / `NCCL_IB_SL` | 106 / 3 | QoS class |
+| `NCCL_IB_TIMEOUT` / `NCCL_IB_RETRY_CNT` | 23 / 7 | stability |
 
-    C->>H: Request
-    H->>TP: Process
-    TP->>W: Distribute
-    W-->>TP: Compute
-    TP-->>H: Gather
-    H-->>M: Partial Response
-    W-->>M: Partial Response
-    M-->>C: Merged Response
-```
+Containers get `/dev/infiniband`, `memlock: -1`, and `IPC_LOCK`, `SYS_NICE`, `SYS_RESOURCE`.
 
-## Performance Optimization
-
-### 1. NCCL Settings
-```mermaid
-graph TB
-    subgraph "NCCL Optimization Stack"
-        TC["Traffic Control<br/>TC: 106"] --> NCCL
-        SL["Service Level: 3<br/>Retry Count: 7"] --> NCCL
-        GDR["GPUDirect RDMA<br/>Level: 5"] --> NCCL
-        MTU["Network Settings<br/>MTU: 9000"] --> NCCL
-        NCCL["NCCL Communication"]
-    end
-```
-
-### 2. Memory Management
-- Unlimited locked memory for RDMA operations
-- Conservative GPU memory utilization (35%)
-- Controlled sequence batching
-
-## Network Requirements
-- **Bandwidth**: 12+ GB/s inter-node
-- **Latency**: < 10μs
-- **MTU**: 9000 (Jumbo frames)
-- **Network**: Dedicated RDMA subnet
-
-## Hardware Requirements
-As detailed in `multi_node_gpu_cluster_with_rdma/setup.md`:
-- NVIDIA GPUs with GPUDirect RDMA support
-- Mellanox ConnectX NICs or similar RDMA-capable NICs
-- RoCE/InfiniBand interconnect
-- CUDA 13.0+
-
-## Software Stack
-```mermaid
-graph TB
-    subgraph "Software Stack"
-        vLLM --> NCCL
-        vLLM --> PyTorch
-        Ray --> PyTorch
-        NCCL --> CUDA
-        PyTorch --> Python
-        PyTorch --> CUDA
-    end
-```
-
-## Deployment Steps
-
-1. **Network Setup**
-   - Configure RDMA network as per `multi_node_gpu_cluster_with_rdma/setup.md`
-   - Verify inter-node connectivity
-   - Set proper MTU and network parameters
-
-2. **Head Node**
-   ```bash
-   cd head
-   cp .env.example .env
-   # Edit .env with your settings
-   docker-compose up -d
-   ```
-
-3. **Worker Node**
-   ```bash
-   cd worker
-   cp .env.exmple .env
-   # Edit .env with your settings
-   docker-compose up -d
-   ```
-
-## Monitoring and Debugging
-
-### 1. Log Streams
-- Head node: `docker-compose logs -f`
-- Worker node: `tail -f /tmp/ray/session_latest/logs/raylet.out`
-
-### 2. Performance Metrics
+### Checking that NCCL really uses RDMA
 ```bash
-# NCCL Tests
-mpirun -np 2 -H 192.168.100.1,192.168.100.2 \
-  /usr/local/nccl-tests/all_reduce_perf -b 8 -e 512M -f 2 -g 1
+docker logs vllm-server 2>&1 | grep -E "NET/IB : Using|via NET/"
+# expect: NET/IB : Using [0]roceP2p1s0f0:1/RoCE   and   via NET/IB/0
+# bad:    NET/Socket  (TCP fallback)
 ```
-
-### 3. Health Checks
-```bash
-# RDMA Status
-rdma link show
-
-# GPU Status
-nvidia-smi topo -m
-```
+A warning `ibv_query_port_speed failed ... Protocol not supported` at startup is harmless.
+Errors with `ibv_reg_mr` / `ENOMEM` are the kernel 7.0 regression pattern: see
+`docs/cluster-update-10-20-2026.md`.
 
 ## Troubleshooting
 
-Common issues and solutions are documented in `multi_node_gpu_cluster_with_rdma/setup.md#troubleshooting`:
-1. NCCL TCP fallback
-2. Low bandwidth
-3. Connection issues
-4. GPU visibility problems
+- **Head waits forever after loading.** The worker isn't running or can't reach
+  `192.168.100.1:29501`. Check `docker logs vllm-worker` on spark-02.
+- **Slow first start.** The compile cache is per node under `/mnt/shared/vllm-compile-cache/`.
+  It's keyed by vLLM version and model, so stale entries are ignored; delete a node's subdir
+  (root-owned, needs sudo) to force a rebuild.
+- **"CUDA Forward Compatibility mode ENABLED" in the log.** Expected: the 26.09 image is built
+  for CUDA 13.4 (driver 615) and runs on driver 595 via forward compatibility.
+- **RDMA bandwidth test** (no sudo): `ib_write_bw -d roceP2p1s0f0 -R -F -q 4 -D 5 --report_gbits`
+  on one node, the same plus the other node's mesh IP on the other. Expect ≈111.7 Gb/s.
 
-## Reference Documentation
-- [Ray Documentation](https://docs.ray.io/)
-- [vLLM Documentation](https://vllm.readthedocs.io/)
-- [NCCL Documentation](https://docs.nvidia.com/deeplearning/nccl/)
-- [GPUDirect RDMA](https://docs.nvidia.com/cuda/gpudirect-rdma/)
-
-## Performance Expectations
-- Large message bandwidth: ~12 GB/s
-- Small message latency: < 10μs
-- Model throughput: Dependent on model size and batch configuration
+## References
+- [vLLM multi-node serving](https://docs.vllm.ai/en/latest/serving/parallelism_scaling.html)
+- [NVIDIA vLLM container release notes](https://docs.nvidia.com/deeplearning/frameworks/vllm-release-notes/)
+- [NCCL environment variables](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html)
