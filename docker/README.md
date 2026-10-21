@@ -27,7 +27,7 @@ graph LR
 |---|---|---|
 | Container | `vllm-server` | `vllm-worker` |
 | Rank | 0 (serves the API on :8000) | 1 (`--headless`, no API) |
-| Image | `nvidia/vllm:26.09-py3` (vLLM 0.29.0, CUDA 13.4.1) | same |
+| Image | `VLLM_IMAGE` in `.env`; default `nvidia/vllm:26.09-py3` (vLLM 0.29.0, CUDA 13.4.1) | same (must match) |
 | Compile cache | `/mnt/shared/vllm-compile-cache/head` | `/mnt/shared/vllm-compile-cache/worker` |
 
 ## Starting and stopping
@@ -100,6 +100,13 @@ Key settings:
 - `HARMONY_ENCODINGS=/mnt/shared/harmony/encodings`, `TIKTOKEN_ENCODINGS_BASE=/etc/encodings`:
   gpt-oss tokenizer files
 - NCCL settings (below)
+
+- `VLLM_IMAGE` / `VLLM_ENTRYPOINT`: which vLLM container to run, identical on both nodes.
+  Unset = NGC `26.09-py3` with NVIDIA's entrypoint (it enables CUDA forward compatibility on
+  driver 595). For upstream images set e.g. `VLLM_IMAGE=vllm/vllm-openai:v0.32.0` and
+  `VLLM_ENTRYPOINT=/usr/bin/env`; their default entrypoint is `vllm serve`, which would swallow
+  the launcher command. Some models need a newer vLLM than NGC ships (Qwen3.8-Flash-Next fails
+  on 0.29 loading its FP8 n-gram embedding).
 
 Don't set `MASTER_ADDR`, `MASTER_PORT`, `RANK` or `WORLD_SIZE` there: PyTorch reads those
 names, and the launcher uses the `CLUSTER_*` variables instead.

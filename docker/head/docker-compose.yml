@@ -3,7 +3,11 @@
 # Start this before the worker: rank 0 hosts the rendezvous on CLUSTER_MASTER_PORT.
 services:
   vllm:
-    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.09-py3
+    # Image and entrypoint must match on both nodes. NGC images need NVIDIA's entrypoint (it enables
+    # CUDA forward compatibility); upstream vllm/vllm-openai images need VLLM_ENTRYPOINT=/usr/bin/env
+    # so their built-in `vllm serve` entrypoint doesn't swallow the launcher command.
+    image: ${VLLM_IMAGE:-docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.09-py3}
+    entrypoint: ${VLLM_ENTRYPOINT:-/opt/nvidia/nvidia_entrypoint.sh}
     container_name: vllm-server
     network_mode: host
     ipc: host
@@ -67,4 +71,4 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: python /config/launch.py
+    command: python3 /config/launch.py

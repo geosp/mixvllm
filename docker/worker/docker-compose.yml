@@ -3,7 +3,9 @@
 # MODEL_NAME in .env must match the head's; the registry comes from the same git repo.
 services:
   vllm:
-    image: docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.09-py3
+    # Must match the head: see the image/entrypoint note in ../head/docker-compose.yml
+    image: ${VLLM_IMAGE:-docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.09-py3}
+    entrypoint: ${VLLM_ENTRYPOINT:-/opt/nvidia/nvidia_entrypoint.sh}
     container_name: vllm-worker
     network_mode: host
     ipc: host
@@ -76,4 +78,4 @@ services:
               count: all
               capabilities: [gpu]
 
-    command: python /config/launch.py
+    command: python3 /config/launch.py
