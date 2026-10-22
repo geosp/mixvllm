@@ -76,6 +76,7 @@ value always wins (vLLM drops unset request values before merging).
 
 | Model | Server default | Per request |
 |---|---|---|
+| `gemma-4-26b-a4b` | thinking **off** (no effort levels; faster and as accurate in testing) | `"chat_template_kwargs"`: `{"enable_thinking": true}` = on. Any `reasoning_effort` except `none` also turns it on, at full length |
 | `qwen3.8-flash-next`, `qwen3.8-27b` | `low` (template default `xhigh`) | `"reasoning_effort"`: `low`, `medium`, `xhigh` (`high` is rejected) |
 | `deepseek-v4-flash` | `low` (vLLM default `high`) | `"reasoning_effort"`: `low`, `high`, `max`; `none` = no thinking |
 | `openai/gpt-oss-120b` | `medium`, not changeable server-side (Harmony format ignores template defaults) | `"reasoning_effort"`: `low`, `medium`, `high` |

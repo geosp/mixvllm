@@ -49,9 +49,10 @@ models:
     reasoning-parser: gemma4
     enable-auto-tool-choice: true
     tool-call-parser: gemma4
-    # Template default is thinking OFF; on here to match the other models.
-    # Requests turn it off with chat_template_kwargs {"enable_thinking": false}.
-    default-chat-template-kwargs: '{"enable_thinking": true}'
+    # Thinking OFF by default: tested equally accurate and 2-9x faster without it
+    # (challenge 1: 126 s vs 256 s; challenge 2: 28 s vs 263 s; RDMA question 1.4 s vs 11.8 s).
+    # Requests turn it on with chat_template_kwargs {"enable_thinking": true}.
+    default-chat-template-kwargs: '{"enable_thinking": false}'
     description: "Gemma 4 26B-A4B NVFP4 MoE (4B active; text/image/video/audio)"
   deepseek-v4-flash:
     model: deepseek-ai/DeepSeek-V4-Flash-0731
