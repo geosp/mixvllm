@@ -36,8 +36,10 @@ models:
     model: nvidia/Gemma-4-26B-A4B-NVFP4
     served-model-name: [gemma-4-26b-a4b, spark]
     # MoE, 4B active, ~17.5 GiB; text + image + video + audio input.
-    # Model card (vLLM 0.20) says TP=1 only; trying TP=2 on 0.32 first.
+    # Plain TP=2 fails on vLLM 0.32: NVFP4 MoE can't pad the split expert matrices
+    # (FLASHINFER_CUTLASS). Expert parallelism keeps experts whole, 64 per node.
     tensor-parallel-size: 2
+    enable-expert-parallel: true
     trust-remote-code: true
     gpu-memory-utilization: 0.50
     max-model-len: 262144
