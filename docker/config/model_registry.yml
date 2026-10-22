@@ -1,5 +1,6 @@
 # served-model-name: first name is the model's own API name; "spark" is a stable alias that
 # always points at whichever model is loaded, so clients don't break on model switches.
+# Default MODEL_NAME: qwen3.8-27b (see "Which model to run" in docker/README.md).
 models:
   gpt-oss-120b:
     model: openai/gpt-oss-120b

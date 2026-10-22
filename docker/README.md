@@ -50,6 +50,18 @@ If either side has to restart, restart both in that order (worker down, head up,
 
 ## Model configuration
 
+### Which model to run
+**Default: `qwen3.8-27b`.** Set `MODEL_NAME` to switch (on both nodes; see below).
+Recommendations come from side-by-side tests on this cluster (vLLM 0.32, server-default effort):
+
+| `MODEL_NAME` | Use for | Speed (tok/s) | Notes |
+|---|---|---|---|
+| `qwen3.8-27b` | **default**: chat, code, vision, tools | 34–44 | consistent code quality; strong on images and video; fine-tuning base. Keep effort `low` (`medium`/`xhigh` can think until the token limit) |
+| `qwen3.8-flash-next` | hardest code, where correctness beats speed | 27–33 | only model with zero errors on every coding test, and the best self-written unit tests; 4–15 min per hard answer; drop caches and compact memory on spark-01 before loading |
+| `openai/gpt-oss-120b` (`gpt-oss-120b`) | fastest strong text model | 55–58 | no vision; at `high` effort as accurate as Flash-Next on hard code |
+| `gemma-4-26b-a4b` | quick chat | 44–50 | fastest replies, but misses edge cases on hard code; weak vision, no audio |
+| `deepseek-v4-flash` | general knowledge (largest model) | 26–35 | slowest; uses 85% of memory |
+
 ### Registry (`./config/model_registry.yml`)
 One entry per model. Every key except `description` becomes a `vllm serve` flag
 (`true` → bare flag, `false` → omitted). `model` is passed positionally.
