@@ -9,6 +9,8 @@ models:
     gpu-memory-utilization: 0.55
     max-num-seqs: 8
     max-model-len: 131072
+    enable-auto-tool-choice: true
+    tool-call-parser: openai
     # Harmony format: vLLM ignores server-side defaults for gpt-oss, so effort stays "medium"
     # unless the request sets reasoning_effort (low | medium | high).
     description: Full-capacity
