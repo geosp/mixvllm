@@ -78,11 +78,10 @@ value always wins (vLLM drops unset request values before merging).
 |---|---|---|
 | `qwen3.8-flash-next`, `qwen3.8-27b` | `low` (template default `xhigh`) | `"reasoning_effort"`: `low`, `medium`, `xhigh` (`high` is rejected) |
 | `deepseek-v4-flash` | `low` (vLLM default `high`) | `"reasoning_effort"`: `low`, `high`, `max`; `none` = no thinking |
-| `nemotron-3.5-super-vl` | medium effort (no "low" level) | `"chat_template_kwargs"`: `{"medium_effort": false}` = full, `{"enable_thinking": false}` = off |
 | `openai/gpt-oss-120b` | `medium`, not changeable server-side (Harmony format ignores template defaults) | `"reasoning_effort"`: `low`, `medium`, `high` |
 
 Clients that call the `spark` alias without knowing which model is loaded should only send
-`"reasoning_effort": "low"` (accepted by every model; Nemotron simply ignores it) or nothing.
+`"reasoning_effort": "low"` (accepted by every model) or nothing.
 
 ```bash
 curl -s http://10.0.0.96:8000/v1/chat/completions -H "Content-Type: application/json" \

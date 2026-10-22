@@ -32,28 +32,6 @@ models:
     # Template default is "xhigh"; accepts low | medium | xhigh only ("high" is rejected)
     default-chat-template-kwargs: '{"reasoning_effort": "low"}'
     description: "Qwen3.8-27B NVFP4 dense VLM (fine-tuning base candidate; ~20 GiB)"
-  nemotron-3.5-super-vl:
-    model: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4
-    served-model-name: [nemotron-3.5-super-vl, spark]
-    tensor-parallel-size: 2
-    trust-remote-code: true
-    gpu-memory-utilization: 0.75
-    max-num-seqs: 8
-    max-num-batched-tokens: 8192
-    max-model-len: 262144
-    block-size: 64
-    prefix-match-unit: 64
-    mamba-backend: flashinfer
-    mamba-ssm-cache-dtype: float16
-    enable-mamba-cache-stochastic-rounding: true
-    mamba-cache-philox-rounds: 5
-    enable-auto-tool-choice: true
-    tool-call-parser: qwen3_coder
-    reasoning-parser: nemotron_v3
-    # No "low" level: medium_effort is the lightest setting with thinking on. Requests override it
-    # with chat_template_kwargs {"medium_effort": false} (full) or {"enable_thinking": false} (off).
-    default-chat-template-kwargs: '{"medium_effort": true}'
-    description: "Nemotron 3.5 Super VL NVFP4 (text+image; card targets vLLM 0.32, MTP off)"
   deepseek-v4-flash:
     model: deepseek-ai/DeepSeek-V4-Flash-0731
     served-model-name: [deepseek-v4-flash, spark]
