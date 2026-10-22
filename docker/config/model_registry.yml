@@ -32,6 +32,23 @@ models:
     # Template default is "xhigh"; accepts low | medium | xhigh only ("high" is rejected)
     default-chat-template-kwargs: '{"reasoning_effort": "low"}'
     description: "Qwen3.8-27B NVFP4 dense VLM (fine-tuning base candidate; ~20 GiB)"
+  gemma-4-26b-a4b:
+    model: nvidia/Gemma-4-26B-A4B-NVFP4
+    served-model-name: [gemma-4-26b-a4b, spark]
+    # MoE, 4B active, ~17.5 GiB; text + image + video + audio input.
+    # Model card (vLLM 0.20) says TP=1 only; trying TP=2 on 0.32 first.
+    tensor-parallel-size: 2
+    trust-remote-code: true
+    gpu-memory-utilization: 0.50
+    max-model-len: 262144
+    max-num-seqs: 8
+    reasoning-parser: gemma4
+    enable-auto-tool-choice: true
+    tool-call-parser: gemma4
+    # Template default is thinking OFF; on here to match the other models.
+    # Requests turn it off with chat_template_kwargs {"enable_thinking": false}.
+    default-chat-template-kwargs: '{"enable_thinking": true}'
+    description: "Gemma 4 26B-A4B NVFP4 MoE (4B active; text/image/video/audio)"
   deepseek-v4-flash:
     model: deepseek-ai/DeepSeek-V4-Flash-0731
     served-model-name: [deepseek-v4-flash, spark]
