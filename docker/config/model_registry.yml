@@ -85,12 +85,12 @@ models:
     max-num-batched-tokens: 8192
     max-model-len: 262144
     # MTP layer is in the checkpoint (FP8 block experts; needs vLLM >= 0.32 for PR #55513).
-    # Model card uses 1 draft token with expert parallelism.
-    speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
+    # Model card uses 1 draft token; 1 measured +42-45% (acceptance 62-80%). Testing 2.
+    speculative-config: '{"method":"mtp","num_speculative_tokens":2}'
     reasoning-parser: qwen3
     enable-auto-tool-choice: true
     tool-call-parser: qwen3_coder
     # Template default is "xhigh"; accepts low | medium | xhigh only ("high" is rejected)
     default-chat-template-kwargs: '{"reasoning_effort": "low"}'
-    description: "Qwen3.8-Flash-Next NVFP4 MoE (native 262K ctx; MTP 1 draft token)"
+    description: "Qwen3.8-Flash-Next NVFP4 MoE (native 262K ctx; MTP 2 draft tokens)"
 
