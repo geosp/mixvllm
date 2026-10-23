@@ -80,7 +80,7 @@ models:
     tensor-parallel-size: 2
     enable-expert-parallel: true
     all2all-backend: allgather_reducescatter
-    gpu-memory-utilization: 0.80
+    gpu-memory-utilization: 0.70  # 0.80 left only 12-14 GB free per node (KV 1.5M tokens)
     max-num-seqs: 8
     max-num-batched-tokens: 8192
     max-model-len: 262144
