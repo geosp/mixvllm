@@ -5,8 +5,7 @@ Two DGX Spark–class nodes (GB10, 121 GB unified memory each) serve one model w
 parallelism 2 across nodes. vLLM's built-in multi-node launcher coordinates the nodes;
 NCCL moves tensors between the GPUs over RDMA (RoCE v2, MTU 9000, ~111 Gb/s).
 
-There is **no Ray**. NVIDIA's vLLM container from 26.09 on ships without it, and each node
-simply runs `vllm serve` with its own rank.
+There is **no Ray**: each node simply runs `vllm serve` with its own rank.
 
 ```mermaid
 graph LR
@@ -27,7 +26,7 @@ graph LR
 |---|---|---|
 | Container | `vllm-server` | `vllm-worker` |
 | Rank | 0 (serves the API on :8000) | 1 (`--headless`, no API) |
-| Image | `VLLM_IMAGE` in `.env`; default `nvidia/vllm:26.09-py3` (vLLM 0.29.0, CUDA 13.4.1) | same (must match) |
+| Image | `VLLM_IMAGE` in `.env` (currently `vllm/vllm-openai:v0.32.0`) | same (must match) |
 | Compile cache | `/mnt/shared/vllm-compile-cache/head` | `/mnt/shared/vllm-compile-cache/worker` |
 
 ## Starting and stopping
@@ -138,10 +137,10 @@ Key settings:
 - NCCL settings (below)
 
 - `VLLM_IMAGE` / `VLLM_ENTRYPOINT`: which vLLM container to run, identical on both nodes.
-  Unset = NGC `26.09-py3` with NVIDIA's entrypoint (it enables CUDA forward compatibility on
-  driver 595). For upstream images set e.g. `VLLM_IMAGE=vllm/vllm-openai:v0.32.0` and
-  `VLLM_ENTRYPOINT=/usr/bin/env`; their default entrypoint is `vllm serve`, which would swallow
-  the launcher command. Some models need a newer vLLM than NGC ships (Qwen3.8-Flash-Next fails
+  Required; there is no default. Upstream images (`vllm/vllm-openai:v0.32.0`) need
+  `VLLM_ENTRYPOINT=/usr/bin/env`, since their default entrypoint is `vllm serve` and would swallow
+  the launcher command. NGC images (`nvcr.io/nvidia/vllm:<tag>`) need
+  `/opt/nvidia/nvidia_entrypoint.sh`, which enables CUDA forward compatibility on driver 595. Some models need a newer vLLM than NGC ships (Qwen3.8-Flash-Next fails
   on 0.29 loading its FP8 n-gram embedding).
 
 Don't set `MASTER_ADDR`, `MASTER_PORT`, `RANK` or `WORLD_SIZE` there: PyTorch reads those
@@ -179,8 +178,8 @@ Errors with `ibv_reg_mr` / `ENOMEM` are the kernel 7.0 regression pattern: see
 - **Slow first start.** The compile cache is per node under `/mnt/shared/vllm-compile-cache/`.
   It's keyed by vLLM version and model, so stale entries are ignored; delete a node's subdir
   (root-owned, needs sudo) to force a rebuild.
-- **"CUDA Forward Compatibility mode ENABLED" in the log.** Expected: the 26.09 image is built
-  for CUDA 13.4 (driver 615) and runs on driver 595 via forward compatibility.
+- **"CUDA Forward Compatibility mode ENABLED" in the log.** Expected with NGC images: 26.09 is
+  built for CUDA 13.4 (driver 615) and runs on driver 595 via forward compatibility.
 - **RDMA bandwidth test** (no sudo): `ib_write_bw -d roceP2p1s0f0 -R -F -q 4 -D 5 --report_gbits`
   on one node, the same plus the other node's mesh IP on the other. Expect ≈111.7 Gb/s.
 

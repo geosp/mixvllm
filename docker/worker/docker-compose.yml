@@ -1,11 +1,11 @@
 # Worker node (rank 1): runs headless vLLM holding the other half of the tensor-parallel group.
-# Multi-node uses vLLM's built-in mp launcher (NGC 26.09+ ships without Ray).
+# Multi-node uses vLLM's built-in mp launcher (no Ray).
 # MODEL_NAME in .env must match the head's; the registry comes from the same git repo.
 services:
   vllm:
-    # Must match the head: see the image/entrypoint note in ../head/docker-compose.yml
-    image: ${VLLM_IMAGE:-docker-registry.mixwarecs-home.net:5000/nvidia/vllm:26.09-py3}
-    entrypoint: ${VLLM_ENTRYPOINT:-/opt/nvidia/nvidia_entrypoint.sh}
+    # Image and entrypoint come from .env and must match the head's (see .env.example).
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE in .env (see .env.example)}
+    entrypoint: ${VLLM_ENTRYPOINT:?set VLLM_ENTRYPOINT in .env (see .env.example)}
     container_name: vllm-worker
     network_mode: host
     ipc: host
