@@ -132,19 +132,20 @@ source .venv/bin/activate
 │   ├── example_model.yaml            # Template configuration
 │   ├── llama-70b-tp2.yaml           # Tensor parallel config for Llama 70B
 │   ├── llama-7b.yaml                # Single GPU config for Llama 7B
-│   ├── mcp_servers.yaml             # MCP servers configuration
-│   └── phi3-mini-with-terminal.yaml # Configuration for Phi-3 model
+│   └── phi3-mini.yaml               # Configuration for Phi-3 model
 ├── docker/                          # Docker deployment configurations
 │   ├── config/                      # Configuration directory
 │   │   ├── launch.py               # Python-based model launcher
 │   │   └── model_registry.yml      # Model configurations
-│   ├── head/                        # Ray head node setup
+│   ├── head/                        # Head node setup
 │   │   ├── docker-compose.yml       # Head node container config
 │   │   ├── .env.example            # Environment template for head
 │   │   └── README.md               # Head node documentation
+│   ├── open-webui/                  # Open WebUI + Open Terminal (chat UI)
+│   │   └── docker-compose.yml
 │   ├── stand_alone/                 # Single node deployment
 │   │   └── docker-compose.yml       # Standalone container config
-│   └── worker/                      # Ray worker node setup
+│   └── worker/                      # Worker node setup
 │       ├── docker-compose.yml       # Worker node container config
 │       ├── .env.exmple             # Environment template for worker
 │       └── README.md               # Worker node documentation
@@ -154,65 +155,10 @@ source .venv/bin/activate
 │   │   ├── config/                 # Server configuration
 │   │   └── inference/              # Inference implementation
 │   └── README.md                   # Server documentation
-├── mixvllm-chat/                    # Chat interface implementation
-│   ├── app/                        # Application code
-│   │   ├── client/                 # Chat client implementation
-│   │   └── utils/                  # Utility functions
-│   └── terminal/                   # Terminal server implementation
 ├── multi_node_gpu_cluster_with_rdma/ # RDMA cluster setup guides
 │   └── setup.md                    # Detailed RDMA configuration
 └── tests/                          # Test suite
-    ├── tensor_parallel.py          # Tensor parallelism tests
-    └── test_mcp.py                # MCP integration tests
-│   ├── docker-compose.yml
-│   ├── entrypoint.sh
-│   └── README.md
-├── mixvllm_server/
-│   ├── pyproject.toml
-│   ├── README.md
-│   └── src/
-│       ├── cli/
-│       │   ├── serve_model.py
-│       │   └── README.md
-│       ├── config/
-│       │   ├── gpt-oss-20b.yaml
-│       │   └── phi3-mini.yaml
-│       ├── inference/
-│       │   ├── config.py
-│       │   ├── server.py
-│       │   ├── utils.py
-│       │   ├── terminal_server.py
-│       │   └── README.md
-├── mixvllm-chat/
-│   ├── Dockerfile.terminal
-│   ├── pyproject.toml
-│   ├── README.md
-│   ├── app/
-│   │   ├── chat_client.py
-│   │   ├── client/
-│   │   │   ├── chat_client.py
-│   │   │   ├── chat_engine.py
-│   │   │   ├── cli.py
-│   │   │   ├── config.py
-│   │   │   ├── connection_manager.py
-│   │   │   ├── history_manager.py
-│   │   │   ├── response_handler.py
-│   │   │   ├── tool_manager.py
-│   │   │   ├── ui_manager.py
-│   │   │   └── utils/
-│   │   │       ├── mcp_client.py
-│   │   │       └── mcp_tools.py
-│   │   ├── config/
-│   │   │   └── mcp_servers.yaml
-│   │   └── utils/
-│   │       ├── mcp_client.py
-│   │       └── mcp_tools.py
-│   ├── terminal/
-│   │   └── terminal_server_standalone.py
-├── tests/
-│   ├── __init__.py
-│   ├── tensor_parallel.py
-│   └── test_mcp.py
+    └── tensor_parallel.py          # Tensor parallelism tests
 ```
 
 ## Quick Start
@@ -385,134 +331,9 @@ curl http://localhost:8000/v1/chat/completions \
   }'
 ```
 
-## Chat Client
+## Chatting with Your Model
 
-The `mixvllm-chat` command provides a CLI chat interface for interactive conversations with your served models. It features rich terminal formatting and enhanced input handling similar to modern CLI applications.
-
-```bash
-# Install dependencies (if not already done)
-uv sync
-
-# Start chatting with default settings
-uv run mixvllm-chat
-
-# Connect to specific server and model
-uv run mixvllm-chat --base-url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
-
-# Enable streaming responses
-uv run mixvllm-chat --stream --temperature 0.8
-```
-
-### Chat Client Features
-
-- **Rich Terminal UI**: Beautiful formatting with colors, panels, and markdown rendering
-- **Conversation Context**: Maintains chat history for coherent conversations
-- **Command Support**: `/help`, `/clear`, `/history`, `/quit`
-- **Enhanced Input**: History-based auto-completion and navigation (with prompt_toolkit)
-- **Streaming Support**: Real-time response streaming with live updates
-- **Model Auto-detection**: Automatically detects available models from server
-- **Error Handling**: Clear error messages with appropriate formatting
-
-### Dependencies
-
-The chat client uses these optional libraries for enhanced UI:
-- `rich`: Beautiful terminal formatting and colors
-- `prompt_toolkit`: Enhanced input with history and completion
-- `requests`: HTTP client for API calls
-
-If these libraries are not available, the client falls back to basic text output.
-
-### Example Chat Session
-
-```
-✓ Connected to vLLM server at http://localhost:8000
-✓ Auto-selected model: microsoft/Phi-3-mini-4k-instruct
-
-╭─ Welcome ─────────────────────────────────────────────────────────────────╮
-│                                                                            │
-│ 🤖 vLLM Chat Client                                                        │
-│                                                                            │
-│ Configuration:                                                             │
-│ • Server: http://localhost:8000                                            │
-│ • Model: microsoft/Phi-3-mini-4k-instruct                                  │
-│                                                                            │
-│ Commands: /help, /clear, /history, /quit                                   │
-│ Type your message and press Enter to chat!                                 │
-│                                                                            │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-You: Hello! How are you today?
-╭─ 🤖 Assistant ─────────────────────────────────────────────────────────────╮
-│ Hello! I'm doing well, thank you for asking. I'm here and ready to help   │
-│ you with any questions or tasks you might have. How can I assist you      │
-│ today?                                                                     │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-You: Tell me about machine learning
-╭─ 🤖 Assistant ─────────────────────────────────────────────────────────────╮
-│ Machine learning is a fascinating field that involves teaching computers  │
-│ to learn from data and make predictions or decisions without being        │
-│ explicitly programmed for each specific task. It's a subset of artificial │
-│ intelligence that focuses on algorithms and statistical models that can   │
-│ improve their performance as they are exposed to more data.               │
-│                                                                            │
-│ There are several main types of machine learning:                          │
-│                                                                            │
-│ 1. **Supervised Learning**: The algorithm learns from labeled training    │
-│    data to make predictions on new, unseen data. Examples include          │
-│    classification (like spam detection) and regression (like predicting    │
-│    house prices).                                                          │
-│                                                                            │
-│ 2. **Unsupervised Learning**: The algorithm finds patterns in data        │
-│    without labeled examples. This includes clustering (grouping similar    │
-│    data points) and dimensionality reduction.                              │
-│                                                                            │
-│ 3. **Reinforcement Learning**: An agent learns through trial and error by │
-│    interacting with an environment, receiving rewards or penalties for     │
-│    actions.                                                                │
-│                                                                            │
-│ Machine learning has applications in many fields including computer        │
-│ vision, natural language processing, recommendation systems, autonomous    │
-│ vehicles, medical diagnosis, and financial trading.                        │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-You: /history
-╭─ 📝 Conversation History ──────────────────────────────────────────────────╮
-│ ┏━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ │
-│ ┃ Turn ┃ Role         ┃ Content                                         ┃ │
-│ ┡━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩ │
-│ │ 1    │ User         │ Hello! How are you today?                       │
-│ │ 2    │ Assistant    │ Hello! I'm doing well, thank you for asking. ... │
-│ │ 3    │ User         │ Tell me about machine learning                  │
-│ │ 4    │ Assistant    │ Machine learning is a fascinating field that... │
-│ └──────┴──────────────┴─────────────────────────────────────────────────┘ │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-You: /quit
-👋 Goodbye!
-```
-
-## Enhanced Chat Client with MCP Tools
-
-The `mixvllm-chat` command provides an advanced chat client with MCP (Model Context Protocol) tool integration, enabling the LLM to call external tools during conversations.
-
-### Features
-
-- **MCP Tool Integration**: Weather queries and other MCP tools
-- **Tool Discovery Display**: Shows available MCP tools on startup
-- **Dual Modes**: Simple chat or agent mode with tool calling
-- **Rich Terminal UI**: Enhanced formatting with panels and colors
-- **Conversation Context**: Maintains chat history
-- **Streaming Support**: Real-time response streaming
-- **Command System**: `/help`, `/clear`, `/history`, `/mcp`, `/quit`
-
-### Installation
-
-Install additional dependencies for MCP support:
-
-```bash
-uv sync
-```
+For a chat UI, run Open WebUI from [docker/open-webui/](docker/open-webui/). It ships with an Open Terminal container that gives the model a sandboxed shell. Point Open WebUI at the server's OpenAI-compatible endpoint (`http://<host>:8000/v1`). For quick checks, use the `curl` examples above.
 
 ## Usage
 
@@ -529,94 +350,6 @@ HF_TOKEN=<your_huggingface_token> uv run mixvllm-serve --config src/config/gpt-o
 - This command will use all settings from `src/config/gpt-oss-20b.yaml`, including model name, tensor parallelism, GPU memory, and dtype.
 - Make sure your environment has access to the required GPUs and the Hugging Face repository.
 - If you encounter quantization or dtype errors, ensure your config file sets `dtype: bfloat16` as shown in the example config.
-
-
-```bash
-# Basic chat with vLLM server (auto-detects model)
-uv run mixvllm-chat
-
-# Connect to specific server (auto-detects model)
-uv run mixvllm-chat --base-url http://localhost:8000
-
-# Specify model explicitly (optional)
-uv run mixvllm-chat --base-url http://localhost:8000 --model microsoft/Phi-3-mini-4k-instruct
-```
-
-#### MCP Agent Mode
-
-```bash
-# Enable MCP tools for weather queries (auto-detects model)
-uv run mixvllm-chat --enable-mcp
-
-# Full configuration with custom MCP config
-uv run mixvllm-chat \
-  --enable-mcp \
-  --mcp-config configs/mcp_servers.yaml \
-  --base-url http://localhost:8000 \
-  --stream \
-  --temperature 0.8
-```
-
-### MCP Tools Available
-
-When MCP mode is enabled, the following tools are available:
-
-- **Weather Queries**: Get current weather, forecasts, and historical data
-- **Location Support**: Supports city names and coordinates
-- **Units**: Celsius or Fahrenheit temperature units
-
-### Example MCP Conversation
-
-```
-✓ Connected to vLLM server at http://localhost:8000
-✓ Auto-selected model: microsoft/Phi-3-mini-4k-instruct
-✓ MCP tools enabled (2 tools available)
-
-╭─ Welcome ─────────────────────────────────────────────────────────────────╮
-│ 🤖 Enhanced vLLM Chat Client (with MCP tools)                             │
-│                                                                           │
-│ Configuration:                                                            │
-│ • Server: http://localhost:8000                                           │
-│ • Model: microsoft/Phi-3-mini-4k-instruct                                 │
-│ • MCP Tools: Enabled                                                      │
-│                                                                           │
-│ Available MCP Tools (2):                                                  │
-│ • weather_get_hourly_weather - Get hourly weather forecast for a location│
-│   using Open-Meteo API (Weather information and forecasts)               │
-│ • weather_geocode_location - Get coordinates and timezone information for│
-│   a location. (Weather information and forecasts)                         │
-│                                                                           │
-│ Commands: /help, /clear, /history, /mcp, /quit                            │
-│ Type your message and press Enter to chat!                                │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-You: What's the weather like in New York?
-╭─ 🌤️ Assistant (with tools) ───────────────────────────────────────────────╮
-│ The user is asking about the weather in New York. I should use the        │
-│ weather_get_weather tool to get current weather information.              │
-│                                                                           │
-│ Tool Call: weather_get_weather(location="New York", units="celsius")      │
-│                                                                           │
-│ Tool Result: [weather] Weather for New York: 22°C, Partly Cloudy, Wind 5  │
-│ km/h                                                                     │
-│                                                                           │
-│ Current weather in New York: 22°C with partly cloudy conditions and light │
-│ winds at 5 km/h.                                                          │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-You: /mcp
-╭─ 🔧 MCP Integration Status ───────────────────────────────────────────────╮
-│ ┏━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓ │
-│ ┃ Server  ┃ Status                                        ┃ Tools       ┃ │
-│ ┡━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩ │
-│ │ weather │ ✓ Connected (2 tools)                         │ get_hourly_ │
-│ │         │                                               │ weather,    │
-│ │         │                                               │ geocode_loc │
-│ │         │                                               │ ation       │
-│ └─────────┴───────────────────────────────────────────────┴─────────────┘ │
-╰────────────────────────────────────────────────────────────────────────────╯
-```
-
 
 ## Distributed Architecture
 
@@ -676,47 +409,3 @@ docker-compose up -d
 ```
 
 For detailed configuration, see [Docker Configuration Guide](docker/README.md).
-
-# Web Terminal
-
-The web terminal provides browser-based access to CLI tools and is now designed to run as a separate process from the model server. This separation allows for more flexible deployment, improved scalability, and independent management of terminal and model services.
-
-### Architecture
-
-- **Model Server**: Serves the vLLM API (OpenAI-compatible) on a configurable port (default: 8000).
-- **Terminal Server**: Runs independently, connects to any model server via HTTP, and provides a full-featured shell and chat interface in the browser (default port: 8888).
-
-### Usage
-
-**Start the model server:**
-```bash
-uv run mixvllm-serve --config configs/gpt-oss-20b.yaml
-# or use any supported config/model options
-```
-
-**Start the terminal server (in a separate process):**
-```bash
-uv run mixvllm-terminal-server --model-server-url http://localhost:8000
-# or use --port to change the terminal port
-```
-
-### Features
-
-- **Browser-Based Terminal**: xterm.js frontend with full shell access
-- **Auto-Start Chat**: Optionally launches `mixvllm-chat` connected to your model server
-- **Flexible Connection**: Terminal server can connect to any OpenAI-compatible API endpoint
-- **Separate Ports**: Terminal and model server run on independent ports for easier scaling and security
-- **Docker Support**: Docker Compose can launch both services as separate containers
-
-### Docker Deployment
-
-```bash
-cd docker
-docker-compose up -d
-# Starts both model-server and terminal-server containers independently
-```
-
-### Security Note
-
-The web terminal provides full shell access with the same permissions as the server process. Only enable in trusted environments. For production, consider network restrictions or authentication.
-

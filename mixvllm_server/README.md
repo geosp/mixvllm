@@ -1,6 +1,6 @@
 # mixvllm_server
 
-High-performance, configurable model serving backend for vLLM, supporting advanced GPU management, robust configuration, and optional web terminal access.
+High-performance, configurable model serving backend for vLLM, supporting advanced GPU management, and robust configuration.
 
 ---
 
@@ -12,7 +12,6 @@ High-performance, configurable model serving backend for vLLM, supporting advanc
 - GPU-aware model serving with tensor parallelism and quantization
 - Pydantic-based config validation
 - Subprocess management for server lifecycle
-- Optional web terminal for browser-based CLI access
 
 ---
 
@@ -28,7 +27,6 @@ mixvllm_server/
 │   │   ├── config.py           # Pydantic config models
 │   │   ├── server.py           # vLLM server wrapper & lifecycle
 │   │   ├── utils.py            # Config utilities & GPU detection
-│   │   ├── terminal_server.py  # Web terminal server (optional)
 │   │   └── README.md           # Inference server documentation
 │   └── config/                 # Example configs
 └── pyproject.toml
@@ -40,7 +38,7 @@ mixvllm_server/
 
 ### 1. Configuration System (`config.py`)
 - Uses Pydantic for type-safe, validated configuration.
-- Supports model, inference, server, terminal, and generation parameters.
+- Supports model, inference, server, and generation parameters.
 - Loads from YAML, merges with CLI overrides.
 
 ### 2. Server Lifecycle (`server.py`)
@@ -57,16 +55,11 @@ mixvllm_server/
 - Uses PyTorch to detect available GPUs and memory.
 - Validates GPU availability before server start.
 
-### 5. Web Terminal (`terminal_server.py`)
-- Optional browser-based terminal using Tornado, terminado, and xterm.js.
-- Runs in a separate thread, independent of model server.
-- Auto-starts chat client on connection (configurable).
-
 ---
 
 ## Configuration
 
-- YAML config supports all model, inference, server, and terminal options.
+- YAML config supports all model, inference, server, and generation options.
 - CLI arguments override YAML for flexible deployment.
 - Example config:
   ```yaml
@@ -82,10 +75,6 @@ mixvllm_server/
     host: "0.0.0.0"
     port: 8000
     workers: 1
-  terminal:
-    enabled: true
-    port: 8888
-    auto_start_chat: true
   generation_defaults:
     temperature: 0.7
     max_tokens: 512
@@ -101,16 +90,6 @@ mixvllm_server/
 - `pyyaml` (YAML parsing)
 - `torch` (GPU detection)
 - `vllm` (model serving backend)
-- `terminado`, `tornado` (web terminal, optional)
-- `xterm.js` (frontend terminal, CDN)
-
----
-
-## Web Terminal Security
-
-- No authentication by default; full shell access.
-- Recommended for trusted/dev environments only.
-- Use behind VPN/firewall or with SSH port forwarding.
 
 ---
 
@@ -118,7 +97,7 @@ mixvllm_server/
 
 - Efficient GPU memory management and tensor parallelism.
 - Subprocess isolation for robust server control.
-- Unit and integration tests for config, server, and terminal.
+- Unit and integration tests for config and server.
 
 ---
 
@@ -127,6 +106,5 @@ mixvllm_server/
 - Dynamic config reloading
 - Health/metrics endpoints
 - GPU utilization tracking
-- Authentication for web terminal
 
 ---

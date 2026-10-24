@@ -33,33 +33,3 @@ services:
 
     restart: unless-stopped
 
-  terminal-server:
-    # build:
-    #   context: ../mixvllm-chat
-    #   dockerfile: Dockerfile.terminal
-    # image: mixvllm-terminal
-    image: ghcr.io/geosp/mixvllm:main
-    container_name: terminal-server
-
-    ports:
-      - "8888:8888"
-
-    volumes:
-      - ../configs:/app/mixvllm/configs
-
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
-      - MODEL_SERVER_URL=http://model-server:8000
-
-    user: mixvllm
-
-    cap_add:
-      - SYS_ADMIN
-
-    depends_on:
-      - model-server
-
-    command: >
-      sh -c "uv run python terminal/terminal_server_standalone.py --model-server-url http://model-server:8000 --host 0.0.0.0 --port 8888"
-
-    restart: unless-stopped
