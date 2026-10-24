@@ -1,15 +1,23 @@
+# Single machine: serves one registry model with `vllm serve` (no multi-node flags).
+# Pick the model with MODEL_NAME (a key in ../config/model_registry.yml); the entry's
+# tensor-parallel-size must not exceed the GPUs on this machine.
 services:
   model-server:
-    image: vllm/vllm-openai:latest
+    # Upstream images default to a `vllm serve` entrypoint, which would swallow the launcher
+    # command. For NGC images set VLLM_ENTRYPOINT=/opt/nvidia/nvidia_entrypoint.sh.
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
+    entrypoint: ${VLLM_ENTRYPOINT:-/usr/bin/env}
     container_name: mixvllm-model-server
 
     ports:
       - "8000:8000"
 
     volumes:
+      - ../config:/config:ro
       - ~/.cache/huggingface:/root/.cache/huggingface
 
     environment:
+      - MODEL_NAME=${MODEL_NAME:?set MODEL_NAME to a key in docker/config/model_registry.yml}
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
 
     deploy:
@@ -22,14 +30,6 @@ services:
 
     ipc: host
 
-    command: >
-      --host 0.0.0.0
-      --port 8000
-      --model TheBloke/Mistral-7B-Instruct-v0.2-AWQ
-      --quantization awq
-      --dtype float16
-      --gpu-memory-utilization 0.95
-      --max-num-seqs 4
+    command: python3 /config/launch.py
 
     restart: unless-stopped
-
