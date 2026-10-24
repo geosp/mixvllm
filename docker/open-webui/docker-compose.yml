@@ -1,0 +1,28 @@
+networks:
+  ai-net:
+    name: ai-net
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest 
+    container_name: open-webui
+    ports:
+      - "3090:8080"
+    volumes:
+      - ./data:/app/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ai-net
+    restart: always
+  open-terminal:
+    image: ghcr.io/open-webui/open-terminal:latest
+    container_name: open-terminal
+    env_file:
+      - ./.env
+    volumes:
+      - open-terminal:/home/user
+    networks:
+      - ai-net
+    restart: always
+volumes:
+  open-terminal:

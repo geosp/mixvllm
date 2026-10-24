@@ -65,3 +65,6 @@ diffusion-tensort/
 
 # Per-node docker env files (hold HF token)
 docker/*/.env
+
+# Open WebUI runtime data
+docker/open-webui/data/
