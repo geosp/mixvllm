@@ -16,14 +16,15 @@ docker/
 └── open-webui/              # Open WebUI + Open Terminal (sandboxed shell for the model)
 spark_cluster/               # `spark-cluster` command: runs the cluster from the control machine
 tests/                       # its tests (`uv run pytest`)
-docs/                        # cluster maintenance notes, startups.csv (restart timings)
+docs/                        # architecture.md (+ local, untracked startups.csv)
 multi_node_gpu_cluster_with_rdma/
 └── setup.md                 # RoCE / RDMA host setup
 ```
 
 Every deployment mounts `docker/config` read-only at `/config` and runs `python3 /config/launch.py`.
 See [docker/README.md](docker/README.md) for `cluster.yml`, the `spark-cluster` commands, the registry
-format, host setup and NCCL tuning.
+format, host setup and NCCL tuning, and [docs/architecture.md](docs/architecture.md) for how the
+pieces fit together (with diagrams).
 
 ## Running
 

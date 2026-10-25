@@ -2,10 +2,9 @@
 
 ## Overview
 Two DGX Spark–class nodes (GB10, 121 GB unified memory each) serve one model with tensor
-parallelism 2 across nodes. vLLM's built-in multi-node launcher coordinates the nodes;
-NCCL moves tensors between the GPUs over RDMA (RoCE v2, MTU 9000, ~111 Gb/s).
-
-There is **no Ray**: each node simply runs `vllm serve` with its own rank.
+parallelism 2 across nodes. Each node runs `vllm serve` with its own rank, and vLLM's built-in
+multi-process launcher coordinates them; NCCL moves tensors between the GPUs over RDMA (RoCE v2,
+MTU 9000, ~111 Gb/s).
 
 ```mermaid
 graph LR
@@ -21,6 +20,8 @@ graph LR
     T0 <-->|"NCCL over RoCE<br/>roceP2p1s0f0"| T1
     H -.->|"rendezvous :29501"| W
 ```
+
+How it all fits together, with diagrams: [docs/architecture.md](../docs/architecture.md).
 
 Everything about the cluster lives in one tracked file, [`cluster.yml`](cluster.yml): the
 machines, the model, the image and every NCCL setting. Every node runs the same
@@ -79,7 +80,8 @@ SSH retries briefly on name-lookup and connection errors.
 When `up` finishes it prints a **readiness summary**: model load time per node, warmup (last node
 loaded → "Application startup complete"), total (head start → ready), the NCCL transport line
 (warning if it fell back to TCP), and one test request's time to first token. Each summary is
-appended to `docs/startups.csv`, so restarts can be compared from data.
+appended to `docs/startups.csv` on the control machine (gitignored, a local history), so restarts
+can be compared from data.
 
 A typical restart of `qwen3.8-flash-next` takes about 11 minutes: ~7 reading the 124 GiB of
 weights in two passes (the worker over NFS about as fast as the head from NVMe), ~3 for warmup,
@@ -121,8 +123,6 @@ registry comment and change `VLLM_IMAGE` when switching to it. Upstream images
 (`vllm/vllm-openai:v0.32.0`) need `VLLM_ENTRYPOINT=/usr/bin/env`, since their default entrypoint
 is `vllm serve` and would swallow the launcher command. NGC images (`nvcr.io/nvidia/vllm:<tag>`)
 need `/opt/nvidia/nvidia_entrypoint.sh`, which enables CUDA forward compatibility on driver 595.
-Some models need a newer vLLM than NGC ships (Qwen3.8-Flash-Next fails on 0.29 loading its FP8
-n-gram embedding).
 
 ### Files on each node (`docker/node/`)
 - `docker-compose.yml`: tracked, the same on every node.
@@ -130,14 +130,33 @@ n-gram embedding).
 - `secrets.env`: by hand, gitignored, `chmod 600`: `HUGGING_FACE_HUB_TOKEN=...`
   (see [`node/secrets.env.example`](node/secrets.env.example)).
 
+**Where `.env` comes from.** It exists only on the nodes
+(`<repo_path>/docker/node/.env`), never on the control machine: `docker/node/` here holds just
+the tracked files. `spark-cluster sync` renders each node's `.env` from `cluster.yml`, reads the
+node's current file over SSH (a missing file counts as empty) and writes it only if it differs
+(via `.env.tmp`, then a rename). `up`, `restart` and `model` sync first, so **the first `sync` or
+`up` creates the file**; there is nothing to copy by hand. The node only needs a checkout that has
+`docker/node/` (otherwise `sync` refuses and says to `pull`).
+
+```bash
+ssh spark-01 cat ~/projects/mixvllm/docker/node/.env   # what a node has now
+uv run spark-cluster sync --dry-run                    # what a cluster.yml change would write
+```
+
+To change a setting, edit `cluster.yml` (`env:` for every node, a node's own `env:` for one),
+then `sync` or `restart`; containers see new values only when they restart.
+
 A plain `docker compose up -d` in `docker/node` still works by hand, once `.env` has been synced.
+Before the first sync it refuses with `run spark-cluster sync to generate .env`, so a node can't
+start half-configured.
 
 ### Adding a node
 1. Host setup (below), a checkout at `repo_path` and `docker/node/secrets.env`.
 2. Add an entry to `nodes:` in `cluster.yml`.
 3. The registry entry's `tensor-parallel-size` × `pipeline-parallel-size` must equal the new
    node count (`check` refuses otherwise): one GPU per node.
-4. Commit, `spark-cluster pull`, `spark-cluster restart`.
+4. Commit, `spark-cluster pull`, `spark-cluster restart`. The restart's sync creates the new
+   node's `.env` and updates the others (`CLUSTER_NNODES` changes on every node).
 
 ## Host setup
 `check` verifies these on every node: the RDMA device (`/dev/infiniband`) is present, and on nodes
@@ -287,8 +306,8 @@ docker logs vllm-server 2>&1 | grep -E "NET/IB : Using|via NET/"
 # bad:    NET/Socket  (TCP fallback)
 ```
 A warning `ibv_query_port_speed failed ... Protocol not supported` at startup is harmless.
-Errors with `ibv_reg_mr` / `ENOMEM` are the kernel 7.0 regression pattern: see
-[`docs/cluster-update-10-20-2026.md`](../docs/cluster-update-10-20-2026.md).
+Errors with `ibv_reg_mr` / `ENOMEM` mean RDMA memory registration failed: check that the node
+runs the kernel and driver listed under "Hardware Context" in [CLAUDE.md](../CLAUDE.md).
 
 ## Troubleshooting
 
@@ -303,8 +322,6 @@ Errors with `ibv_reg_mr` / `ENOMEM` are the kernel 7.0 regression pattern: see
   `sync`/`model` is running. If it died, rerun with `--force-unlock`.
 - **ssh: Could not resolve hostname.** Happens now and then from the control machine; every SSH
   call retries a few times before giving up.
-- **"CUDA Forward Compatibility mode ENABLED" in the log.** Expected with NGC images: 26.09 is
-  built for CUDA 13.4 (driver 615) and runs on driver 595 via forward compatibility.
 - **RDMA bandwidth test** (no sudo): `ib_write_bw -d roceP2p1s0f0 -R -F -q 4 -D 5 --report_gbits`
   on one node, the same plus the other node's mesh IP on the other. Expect ≈111.7 Gb/s.
 

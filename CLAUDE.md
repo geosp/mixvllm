@@ -5,7 +5,7 @@
 MixVLLM serves large language models with **vLLM** through an OpenAI-compatible API. Models are
 defined once in a registry and launched the same way everywhere. The main deployment is a 2-node
 DGX Spark cluster that runs one model with tensor parallelism across both nodes over RDMA/RoCE,
-using vLLM's built-in multi-node launcher (no Ray). The cluster is defined in one tracked file,
+using vLLM's built-in multi-node launcher. The cluster is defined in one tracked file,
 `docker/cluster.yml`, and run from the control machine with the `spark-cluster` command.
 
 ## Repository Structure
@@ -25,7 +25,7 @@ spark_cluster/                # `spark-cluster` CLI (uv project at the repo root
   checks.py, node_probe.py    # `check`; node_probe.py runs on the nodes with stdlib python3
   progress.py                 # container state + startup stage from `docker logs`, rich tables
 tests/                        # pytest, no SSH needed (fixtures in tests/data/)
-docs/                         # maintenance notes, startups.csv (one row per `up`)
+docs/                         # architecture.md (diagrams); startups.csv is local, untracked
 multi_node_gpu_cluster_with_rdma/setup.md   # RoCE host setup
 ```
 
@@ -77,7 +77,7 @@ MODEL_NAME=gpt-oss-120b python docker/config/launch.py --dry-run   # the vllm se
 ## Hardware Context
 
 - Nodes: NVIDIA DGX Spark — GB10 Grace Blackwell, 121 GB unified memory, DGX OS 7.6, kernel
-  6.17.0-1032, driver 595.99.02 (see `docs/cluster-update-10-20-2026.md`)
+  6.17.0-1032, driver 595.99.02
 - RDMA mesh on 192.168.100.x (`roceP2p1s0f0` / `enP2p1s0f0np0`), management on 10.0.0.x
 - spark-01 exports `/mnt/shared` (local NVMe) over NFS/RDMA; spark-02 mounts it with
   `proto=rdma` and 16 MB read-ahead (`nfs-shared-readahead.service`)

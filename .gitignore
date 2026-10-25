@@ -50,6 +50,9 @@ models/
 logs/
 !tests/data/*.log
 
+# Restart timings appended by `spark-cluster up` (local to each control machine)
+docs/startups.csv
+
 # OS
 .DS_Store
 Thumbs.db

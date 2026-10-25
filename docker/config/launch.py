@@ -3,7 +3,7 @@
 vLLM launcher - reads model config from registry YAML and launches vLLM.
 Usage: MODEL_NAME=gpt-oss-20b python launch.py [--dry-run]
 
-Multi-node (vLLM's built-in mp launcher, no Ray) is enabled by CLUSTER_NNODES > 1.
+Multi-node (vLLM's built-in mp launcher) is enabled by CLUSTER_NNODES > 1.
 Every node runs this script with the same MODEL_NAME; rank 0 serves the API and
 the other ranks run headless:
   CLUSTER_NNODES=2 CLUSTER_NODE_RANK=0|1 CLUSTER_MASTER_ADDR=192.168.100.1
