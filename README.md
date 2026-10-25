@@ -10,25 +10,34 @@ docker/
 ├── config/
 │   ├── model_registry.yml   # one entry per model; keys become `vllm serve` flags
 │   └── launch.py            # reads MODEL_NAME, builds and runs the `vllm serve` command
-├── head/                    # 2-node cluster, rank 0 (serves the API on :8000)
-├── worker/                  # 2-node cluster, rank 1 (headless)
+├── cluster.yml              # the cluster: nodes, model, image, NCCL settings (one tracked file)
+├── node/                    # one compose file for every cluster node (.env generated per node)
 ├── stand_alone/             # single machine
 └── open-webui/              # Open WebUI + Open Terminal (sandboxed shell for the model)
+spark_cluster/               # `spark-cluster` command: runs the cluster from the control machine
+tests/                       # its tests (`uv run pytest`)
+docs/                        # cluster maintenance notes, startups.csv (restart timings)
 multi_node_gpu_cluster_with_rdma/
 └── setup.md                 # RoCE / RDMA host setup
 ```
 
 Every deployment mounts `docker/config` read-only at `/config` and runs `python3 /config/launch.py`.
-See [docker/README.md](docker/README.md) for the registry format, per-node `.env` settings, and NCCL tuning.
+See [docker/README.md](docker/README.md) for `cluster.yml`, the `spark-cluster` commands, the registry
+format, host setup and NCCL tuning.
 
 ## Running
 
-**Two-node cluster** (head first, then worker; set `MODEL_NAME` identically in each node's `.env`):
+**Two-node cluster**, from the control machine (needs [uv](https://docs.astral.sh/uv/) and SSH to
+the nodes; each node needs a checkout and `docker/node/secrets.env`):
 
 ```bash
-cd docker/head && docker compose up -d     # on the head node
-cd docker/worker && docker compose up -d   # on the worker node
+uv run spark-cluster status              # what's running, startup stage, /health
+uv run spark-cluster up                  # check, sync .env, start in rank order, follow progress
+uv run spark-cluster model qwen3.8-27b   # switch model (edits cluster.yml) and restart
+uv run spark-cluster down
 ```
+
+`uv tool install --editable .` puts `spark-cluster` on the PATH.
 
 **Single machine:**
 

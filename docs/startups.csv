@@ -1,0 +1,4 @@
+date,model,commit,image,node_load_s,warmup_s,total_s,nccl_transport,ttft_s
+2026-10-24 23:11,qwen3.8-flash-next,9e16607,vllm/vllm-openai:v0.32.0,spark-01=432 spark-02=411,225,706,NET/IB : Using [0]roceP2p1s0f0:1/RoCE [RO]; OOB enP2p1s0f0np0:192.168.100.1<0>,0.18
+2026-10-24 23:28,qwen3.8-flash-next,1094047,vllm/vllm-openai:v0.32.0,spark-01=381 spark-02=404,217,657,NET/IB : Using [0]roceP2p1s0f0:1/RoCE [RO]; OOB enP2p1s0f0np0:192.168.100.1<0>,0.19
+2026-10-24 23:44,qwen3.8-flash-next,7839d6d,vllm/vllm-openai:v0.32.0,spark-01=396 spark-02=376,209,641,NET/IB : Using [0]roceP2p1s0f0:1/RoCE [RO]; OOB enP2p1s0f0np0:192.168.100.1<0>,0.20

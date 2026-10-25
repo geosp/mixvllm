@@ -1,0 +1,62 @@
+# One vLLM node of the cluster (any rank). Multi-node uses vLLM's built-in mp launcher (no Ray).
+# .env is generated from ../cluster.yml by `spark-cluster sync`; secrets.env is per node, by hand.
+# Rank 0 serves the API on :8000 and hosts the rendezvous, so it starts first.
+services:
+  vllm:
+    image: ${VLLM_IMAGE:?run spark-cluster sync to generate .env}
+    entrypoint: ${VLLM_ENTRYPOINT:?run spark-cluster sync to generate .env}
+    container_name: ${CONTAINER_NAME:?run spark-cluster sync to generate .env}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    runtime: nvidia
+    env_file:
+      - ./.env          # MODEL_NAME, NCCL_*, VLLM_HOST_IP, ...
+      - ./secrets.env   # HUGGING_FACE_HUB_TOKEN
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - VLLM_LOGGING_LEVEL=INFO
+
+      # Multi-node (read by /config/launch.py)
+      - CLUSTER_NNODES=${CLUSTER_NNODES:?}
+      - CLUSTER_NODE_RANK=${CLUSTER_NODE_RANK:?}
+      - CLUSTER_MASTER_ADDR=${CLUSTER_MASTER_ADDR:?}
+      - CLUSTER_MASTER_PORT=${CLUSTER_MASTER_PORT:?}
+      - GLOO_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME}
+
+    # RDMA device + sysfs visibility inside the container
+    devices:
+      - /dev/infiniband:/dev/infiniband
+    volumes:
+      - ../config:/config:ro
+      - ${HF_HOME}:/root/.cache/huggingface
+      - ${HARMONY_ENCODINGS}:/etc/encodings/:ro
+      # torch.compile / FlashInfer autotune cache survives container recreation (per node: no NFS races)
+      - /mnt/shared/vllm-compile-cache/${NODE_NAME:?}:/root/.cache/vllm
+      - /sys/class/infiniband:/sys/class/infiniband:ro
+      - /sys/class/net:/sys/class/net:ro
+      - /etc/rdma:/etc/rdma:ro
+
+    security_opt:
+      - apparmor:unconfined
+
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    cap_add:
+      - IPC_LOCK
+      - SYS_NICE
+      - SYS_RESOURCE
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    command: python3 /config/launch.py

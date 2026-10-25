@@ -1,0 +1,48 @@
+# The cluster: every machine and every shared setting, in one place.
+# `uv run spark-cluster sync` (or `up`) renders each node's docker/node/.env from this file;
+# never edit those .env files by hand. See docker/README.md.
+repo_path: ~/projects/mixvllm          # checkout on every node
+api_url: http://10.0.0.96:8000         # head's API, used for health checks
+master_port: 29501                     # rank 0's rendezvous port on the mesh
+
+env:                                   # identical on every node
+  # Registry key in docker/config/model_registry.yml; switch with `spark-cluster model <name>`.
+  # Its tensor-parallel-size × pipeline-parallel-size must equal the number of nodes.
+  MODEL_NAME: qwen3.8-flash-next
+
+  # One image for all models. Upstream images need entrypoint /usr/bin/env (their default,
+  # `vllm serve`, would swallow the launcher command). NGC images (nvcr.io/nvidia/vllm) need
+  # /opt/nvidia/nvidia_entrypoint.sh, which enables CUDA forward compatibility on driver 595.
+  VLLM_IMAGE: vllm/vllm-openai:v0.32.0
+  VLLM_ENTRYPOINT: /usr/bin/env
+
+  # Host folders, shared by spark-01 over NFS/RDMA (one copy of each model)
+  HF_HOME: /mnt/shared/huggingface
+  HARMONY_ENCODINGS: /mnt/shared/harmony/encodings
+  TIKTOKEN_ENCODINGS_BASE: /etc/encodings   # where HARMONY_ENCODINGS is mounted (gpt-oss tokenizer)
+
+  # NCCL / RDMA: hard-won on GB10 unified memory; change one at a time.
+  NCCL_IB_HCA: roceP2p1s0f0              # the active RoCE device
+  NCCL_IB_DISABLE: 0
+  NCCL_IB_GID_INDEX: 0
+  NCCL_SOCKET_IFNAME: enP2p1s0f0np0      # bootstrap traffic stays on the mesh (also GLOO_SOCKET_IFNAME)
+  NCCL_NET_GDR_LEVEL: 0                  # GPUDirect RDMA off: DMABUF hangs on GB10 with many communicators
+  NCCL_IB_GDR_DMABUF_ENABLE: 0           # required: vLLM creates 60+ communicators, each triggering DMABUF
+  NCCL_IB_TC: 106                        # QoS traffic class
+  NCCL_IB_SL: 3                          # QoS service level
+  NCCL_IB_TIMEOUT: 23                    # stability
+  NCCL_IB_RETRY_CNT: 7                   # stability
+  NCCL_TIMEOUT: 60                       # seconds per NCCL operation
+  NCCL_CROSS_NIC: 0                      # single-NIC path
+  NCCL_DEBUG: INFO                       # spark-cluster reads the transport line ("NET/IB : Using") from the log
+  NCCL_DEBUG_SUBSYS: INIT,NET,IB
+
+nodes:                                 # list order = rank; the first node is the head
+  - name: spark-01
+    ssh: spark-01                      # the name in ~/.ssh/known_hosts; lookups are retried
+    mesh_ip: 192.168.100.1
+    env:                               # per-node overrides (win over env above)
+      NCCL_NET_PLUGIN: none            # the HPC-X plugin causes DMABUF hangs
+  - name: spark-02
+    ssh: spark-02
+    mesh_ip: 192.168.100.2
