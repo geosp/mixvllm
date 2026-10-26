@@ -1,0 +1,7 @@
+{
+  "kind": "code",
+  "title": "Exact arithmetic evaluator",
+  "prompt": "prompt.md",
+  "max_tokens": 32000,
+  "repeat": 1
+}

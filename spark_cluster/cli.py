@@ -24,6 +24,7 @@ from rich.prompt import Confirm
 from rich.table import Table
 
 from . import checks as checks_mod
+from . import eval as eval_mod
 from . import progress, remote
 from .config import (
     CLUSTER_FILE,
@@ -400,19 +401,30 @@ def cmd_sync(cluster: Cluster, args) -> int:
     return 0
 
 
+def no_eval_running(cluster: Cluster) -> None:
+    """Restarting mid-evaluation would spoil its results without any error, so refuse."""
+    busy = eval_mod.running_runs(cluster)
+    if busy:
+        raise Failed(f"evaluation {busy[0]} is running against the cluster: wait for it, "
+                     f"or stop it with `spark-cluster eval stop {busy[0]}`")
+
+
 def cmd_up(cluster: Cluster, args) -> int:
+    no_eval_running(cluster)
     with cluster_lock(cluster, args.force_unlock):
         result = do_up(cluster, args.timeout, not args.no_drop_caches)
     return {True: 0, False: 1, None: 130}[result]
 
 
 def cmd_down(cluster: Cluster, args) -> int:
+    no_eval_running(cluster)
     with cluster_lock(cluster, args.force_unlock):
         do_down(cluster)
     return 0
 
 
 def cmd_restart(cluster: Cluster, args) -> int:
+    no_eval_running(cluster)
     with cluster_lock(cluster, args.force_unlock):
         do_down(cluster)
         result = do_up(cluster, args.timeout, not args.no_drop_caches)
@@ -488,6 +500,7 @@ def cmd_model(cluster: Cluster, args) -> int:
         info(f"{new} is already the configured model (use `spark-cluster restart` to restart it)")
         return 0
 
+    no_eval_running(cluster)
     with cluster_lock(cluster, args.force_unlock):
         write_model_name(cluster.path, new)
         info(f"cluster.yml: MODEL_NAME {old} → {new}")
@@ -541,6 +554,7 @@ def build_parser() -> argparse.ArgumentParser:
     logs.add_argument("--tail", type=int, default=50)
     add("pull", cmd_pull, "git pull --ff-only on every node (refuses on local changes)")
     add("model", cmd_model, "switch MODEL_NAME in cluster.yml and restart", changes=True, starts=True).add_argument("model")
+    eval_mod.add_parsers(sub)
     return p
 
 
@@ -549,7 +563,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         cluster = load_cluster(args.config)
         code = args.fn(cluster, args)
-    except (ConfigError, Failed, remote.RemoteError) as e:
+    except (ConfigError, Failed, remote.RemoteError, eval_mod.EvalError) as e:
         error(str(e))
         code = 1
     except KeyboardInterrupt:

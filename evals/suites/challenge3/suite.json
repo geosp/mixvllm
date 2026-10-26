@@ -1,0 +1,11 @@
+{
+  "kind": "fix_loop",
+  "title": "Challenge 2 task, model writes its own tests, up to 3 fix rounds",
+  "prompt": "prompt.md",
+  "max_tokens": 32000,
+  "rounds": 3,
+  "time_cap": 1800,
+  "grader_suite": "challenge2",
+  "own_tests_runner": "run_own_tests.py",
+  "repeat": 1
+}

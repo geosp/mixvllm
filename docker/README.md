@@ -181,8 +181,12 @@ rdma-port=20049
 192.168.100.1:/mnt/shared  /mnt/shared  nfs  proto=rdma,port=20049,vers=4.1,_netdev  0  0
 ```
 
-**NFS read-ahead (other nodes).** The default 128 KB makes the worker load weights several times
-slower than the head. `/etc/systemd/system/nfs-shared-readahead.service`, enabled with
+**NFS read-ahead (other nodes).** Read-ahead is how far the NFS client fetches ahead of a
+sequential read. Each request is already 1 MB (`rsize`), but at the default 128 KB read-ahead
+there's too little in flight to fill the RDMA link. With 16 MB, a cold single-file read on spark-02
+went from 914 MB/s to 3.3 GB/s. The worker's model load went from 520 s to 437 s, against 418 s on
+the head from local NVMe, so the worker no longer holds up startup. It only affects loading
+weights, not generation speed. `/etc/systemd/system/nfs-shared-readahead.service`, enabled with
 `sudo systemctl enable --now nfs-shared-readahead.service`:
 ```ini
 [Unit]
@@ -316,7 +320,7 @@ runs the kernel and driver listed under "Hardware Context" in [CLAUDE.md](../CLA
 - **Slow first start.** The compile cache is per node under
   `/mnt/shared/vllm-compile-cache/<node name>`. It's keyed by vLLM version and model, so stale
   entries are ignored; delete a node's subdir (root-owned, needs sudo) to force a rebuild.
-- **The worker loads weights much slower than the head.** NFS read-ahead is back at 128 KB
+- **The worker finishes loading weights well after the head** (about 20% slower in total). NFS read-ahead is back at 128 KB
   (`spark-cluster check` shows it): see "NFS read-ahead" under Host setup.
 - **"another spark-cluster run holds /tmp/spark-cluster.lock".** Another `up`/`down`/`restart`/
   `sync`/`model` is running. If it died, rerun with `--force-unlock`.

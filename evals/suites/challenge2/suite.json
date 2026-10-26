@@ -1,0 +1,8 @@
+{
+  "kind": "code",
+  "title": "Smallest shipping box, 3D packing (hidden tests + stress test)",
+  "prompt": "prompt.md",
+  "max_tokens": 32000,
+  "repeat": 2,
+  "allow_budget": true
+}

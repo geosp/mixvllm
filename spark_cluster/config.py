@@ -64,6 +64,7 @@ class Cluster:
     env: dict[str, str]
     nodes: list[Node]
     path: Path
+    evals_path: str | None = None  # private evaluation suite on the head (spark-cluster eval)
 
     @property
     def head(self) -> Node:
@@ -151,6 +152,7 @@ def load_cluster(path: Path = CLUSTER_FILE) -> Cluster:
         env=env,
         nodes=nodes,
         path=path,
+        evals_path=str(data["evals_path"]).rstrip("/") if data.get("evals_path") else None,
     )
 
 

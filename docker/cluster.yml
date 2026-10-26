@@ -4,6 +4,7 @@
 repo_path: ~/projects/mixvllm          # checkout on every node
 api_url: http://10.0.0.96:8000         # head's API, used for health checks
 master_port: 29501                     # rank 0's rendezvous port on the mesh
+evals_path: /mnt/shared/evals          # private evaluation suite on the head (spark-cluster eval); not in git
 
 env:                                   # identical on every node
   # Registry key in docker/config/model_registry.yml; switch with `spark-cluster model <name>`.

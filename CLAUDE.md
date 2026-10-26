@@ -24,6 +24,10 @@ spark_cluster/                # `spark-cluster` CLI (uv project at the repo root
   remote.py                   # SSH with retries, parallel across nodes
   checks.py, node_probe.py    # `check`; node_probe.py runs on the nodes with stdlib python3
   progress.py                 # container state + startup stage from `docker logs`, rich tables
+  eval.py                     # `spark-cluster eval`: run/watch/status/stop/report/grade/verify/init
+  evalkit/                    # shipped to the head: runner, sandbox + shim (isolated grading), verify
+evals/suites/                 # PUBLIC task specs only (prompts, SPEC.md); answer keys live on the head
+.claude/skills/               # evaluate-model, setup-evals
 tests/                        # pytest, no SSH needed (fixtures in tests/data/)
 docs/                         # architecture.md (diagrams); startups.csv is local, untracked
 multi_node_gpu_cluster_with_rdma/setup.md   # RoCE host setup
@@ -50,6 +54,8 @@ uv run spark-cluster model <name>      # edit MODEL_NAME in cluster.yml and rest
 uv run spark-cluster download <name>   # into the shared HF folder, on the head only
 uv run spark-cluster pull              # git pull --ff-only on every node
 uv run spark-cluster logs [node]
+uv run spark-cluster eval run --tag <name>   # evaluate the served model (private suite, see docs/model-evaluations.md)
+uv run spark-cluster eval report
 uv run pytest
 MODEL_NAME=gpt-oss-120b python docker/config/launch.py --dry-run   # the vllm serve command
 ```
@@ -73,6 +79,11 @@ MODEL_NAME=gpt-oss-120b python docker/config/launch.py --dry-run   # the vllm se
 - Before starting, `up` drops the page cache and compacts memory on every node through a privileged
   container (no sudo needed); page cache counts against vLLM's free-memory check on unified memory.
 - API: OpenAI-compatible on http://10.0.0.96:8000; every model is also served as `spark`.
+
+- Model evaluation: the private suite (hidden tests, reference solutions, answer keys) lives on the
+  head at `cluster.yml`'s `evals_path` (`/mnt/shared/evals`), never in this public repo. Model code
+  is graded in its own sandbox container with no answer key in reach. `/evaluate-model` evaluates a
+  model end to end; `/setup-evals` generates and verifies a suite from `evals/` when there is none.
 
 ## Hardware Context
 

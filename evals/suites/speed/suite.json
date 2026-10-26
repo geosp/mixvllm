@@ -1,0 +1,8 @@
+{
+  "kind": "speed",
+  "title": "Generation speed: prose and code (512 tokens forced), short answer",
+  "prose": "Write a long story about a lighthouse.",
+  "code": "Write a Python implementation of a thread-safe LRU cache with type hints, docstrings and unit tests.",
+  "short": "Explain RDMA in two sentences.",
+  "forced_tokens": 512
+}
