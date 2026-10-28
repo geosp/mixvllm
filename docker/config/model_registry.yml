@@ -99,8 +99,10 @@ models:
     # Qwen3.5-122B-A10B fine-tune (256 experts, 8 active). Experts are W4A16_NVFP4 (weight-only,
     # Marlin FP4 GEMM), attention FP8, MTP layer unquantized BF16 (~4.8 GB). No .py files in the
     # repo, so no trust-remote-code. Thinking on by default; no reasoning_effort levels.
-    # KV cache stays BF16: the config declares FP8 KV but the checkpoint has no k/v scales, and
-    # 12 full-attention layers x 2 KV heads need only ~12 KB/token per node.
+    # KV cache BF16: the config declares FP8 KV but the checkpoint has no k/v scales, and
+    # 12 full-attention layers x 2 KV heads need only ~12 KB/token per node. Must be explicit:
+    # with "auto" vLLM picks FP8 from the checkpoint's kv_cache_scheme.
+    kv-cache-dtype: bfloat16
     tensor-parallel-size: 2
     enable-expert-parallel: true
     all2all-backend: allgather_reducescatter
